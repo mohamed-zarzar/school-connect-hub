@@ -23,6 +23,8 @@ export default function TeacherDetail() {
   if (isLoading) return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-64 w-full" /></div>;
   if (!teacher) return <div className="text-center py-12 text-muted-foreground">Teacher not found</div>;
 
+  const classAssignments = teacher.classAssignments || [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -39,10 +41,23 @@ export default function TeacherDetail() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle className="text-lg">Classes</CardTitle></CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {teacher.classIds.map(cid => <Badge key={cid} variant="outline">{classesRes?.data?.find(c => c.id === cid)?.name || cid}</Badge>)}
-            {teacher.classIds.length === 0 && <p className="text-muted-foreground">None assigned</p>}
+          <CardHeader><CardTitle className="text-lg">Class Assignments</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {classAssignments.length === 0 && <p className="text-muted-foreground">None assigned</p>}
+            {classAssignments.map(a => {
+              const cls = classesRes?.data?.find(c => c.id === a.classId);
+              return (
+                <div key={a.classId} className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline">{cls?.name || a.classId}</Badge>
+                  <span className="text-muted-foreground text-xs">→</span>
+                  {a.subjectIds.map(sid => (
+                    <Badge key={sid} variant="secondary" className="text-xs">
+                      {subjectsRes?.data?.find(s => s.id === sid)?.name || sid}
+                    </Badge>
+                  ))}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
         <Card className="lg:col-span-2">

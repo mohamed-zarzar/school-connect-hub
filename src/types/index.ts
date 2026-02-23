@@ -41,12 +41,17 @@ export interface Student {
   createdAt: string;
 }
 
+export interface ClassAssignment {
+  classId: string;
+  subjectIds: string[];
+}
+
 export interface Teacher {
   id: string;
   firstname: string;
   lastname: string;
   subjectIds: string[];
-  classIds: string[];
+  classAssignments: ClassAssignment[];
   dynamicFields: Record<string, any>;
   createdAt: string;
 }

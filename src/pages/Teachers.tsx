@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus } from 'lucide-react';
+import { Plus, X, PlusCircle } from 'lucide-react';
 import { teacherApi, subjectApi, classApi, levelApi, templateApi } from '@/services/api';
 import { buildDynamicSchema, getDynamicDefaults } from '@/lib/schema-builder';
 import type { Teacher } from '@/types';
@@ -15,6 +15,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { DataTable, type Column } from '@/components/DataTable';
 import { DynamicFormFields } from '@/components/DynamicFormFields';
 import { InlineSubjectCreate } from '@/components/InlineCreateDialog';
@@ -45,13 +47,21 @@ export default function TeachersPage() {
     { key: 'firstname', label: 'First Name' },
     { key: 'lastname', label: 'Last Name' },
     { key: 'subjectIds', label: 'Subjects', render: t => t.subjectIds.map(id => subjectsRes?.data?.find(s => s.id === id)?.name).filter(Boolean).join(', ') || '—' },
+    { key: 'classAssignments' as any, label: 'Classes', render: (t: Teacher) => {
+      const assignments = t.classAssignments || [];
+      if (assignments.length === 0) return '—';
+      return assignments.map(a => {
+        const cls = classesRes?.data?.find(c => c.id === a.classId);
+        return cls?.name || a.classId;
+      }).join(', ');
+    }},
     ...fields.filter(f => f.visible).slice(0, 2).map(f => ({ key: f.name, label: f.label, render: (t: Teacher) => String(t.dynamicFields?.[f.name] ?? '—') })),
-  ], [fields, subjectsRes]);
+  ], [fields, subjectsRes, classesRes]);
 
   const handleImport = (rows: Record<string, string>[]) => {
     let count = 0;
     rows.forEach(row => {
-      const teacher: Partial<Teacher> = { firstname: row['First Name'] || row['firstname'] || '', lastname: row['Last Name'] || row['lastname'] || '', subjectIds: [], classIds: [], dynamicFields: {} };
+      const teacher: Partial<Teacher> = { firstname: row['First Name'] || row['firstname'] || '', lastname: row['Last Name'] || row['lastname'] || '', subjectIds: [], classAssignments: [], dynamicFields: {} };
       if (teacher.firstname && teacher.lastname) { createMut.mutate(teacher); count++; }
     });
     toast.success(`Imported ${count} teachers`);
@@ -79,7 +89,10 @@ function TeacherDialog({ open, onOpenChange, editing, fields, subjects, classes,
     firstname: z.string().min(1, 'Required'),
     lastname: z.string().min(1, 'Required'),
     subjectIds: z.array(z.string()).optional(),
-    classIds: z.array(z.string()).optional(),
+    classAssignments: z.array(z.object({
+      classId: z.string().min(1, 'Select a class'),
+      subjectIds: z.array(z.string()).min(1, 'Select at least one subject'),
+    })).optional(),
     photo: z.string().optional(),
     ...buildDynamicSchema(fields)
   });
@@ -88,21 +101,27 @@ function TeacherDialog({ open, onOpenChange, editing, fields, subjects, classes,
     defaultValues: {
       firstname: '',
       lastname: '',
-      subjectIds: [],
-      classIds: [],
+      subjectIds: [] as string[],
+      classAssignments: [] as { classId: string; subjectIds: string[] }[],
       photo: '',
       ...getDynamicDefaults(fields)
     }
   });
 
-  // Reset form when dialog opens or when editing/fields change
+  const { fields: assignmentFields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'classAssignments',
+  });
+
+  const selectedSubjectIds: string[] = form.watch('subjectIds') || [];
+
   useEffect(() => {
     if (open) {
       form.reset({
         firstname: editing?.firstname || '',
         lastname: editing?.lastname || '',
         subjectIds: editing?.subjectIds || [],
-        classIds: editing?.classIds || [],
+        classAssignments: editing?.classAssignments || [],
         photo: editing?.dynamicFields?.photo || '',
         ...getDynamicDefaults(fields, editing?.dynamicFields)
       });
@@ -110,9 +129,12 @@ function TeacherDialog({ open, onOpenChange, editing, fields, subjects, classes,
   }, [open, editing, fields, form]);
 
   const handleSubmit = (data: any) => {
-    const { firstname, lastname, subjectIds, classIds, photo, ...rest } = data;
-    onSubmit({ firstname, lastname, subjectIds, classIds, dynamicFields: { ...rest, photo } });
+    const { firstname, lastname, subjectIds, classAssignments, photo, ...rest } = data;
+    onSubmit({ firstname, lastname, subjectIds, classAssignments: classAssignments || [], dynamicFields: { ...rest, photo } });
   };
+
+  // Get already-assigned class IDs to prevent duplicate assignments
+  const assignedClassIds = (form.watch('classAssignments') || []).map((a: any) => a.classId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,31 +180,103 @@ function TeacherDialog({ open, onOpenChange, editing, fields, subjects, classes,
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="classIds" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Classes</FormLabel>
-                <div className="rounded-md border p-3 max-h-40 overflow-auto space-y-3">
-                  {levels.map((l: any) => (
-                    <div key={l.id}>
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">{l.name}</p>
-                      {classes.filter((c: any) => c.levelId === l.id).map((c: any) => (
-                        <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer ml-2">
-                          <Checkbox
-                            checked={(field.value || []).includes(c.id)}
-                            onCheckedChange={ch => {
-                              const v = field.value || [];
-                              field.onChange(ch ? [...v, c.id] : v.filter((x: string) => x !== c.id));
-                            }}
-                          />
-                          {c.name}
-                        </label>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                <FormMessage />
-              </FormItem>
-            )} />
+
+            {/* Class Assignments with Subjects */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <FormLabel>Class Assignments</FormLabel>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ classId: '', subjectIds: [] })}
+                  disabled={selectedSubjectIds.length === 0}
+                >
+                  <PlusCircle className="mr-1 h-4 w-4" />Add Class
+                </Button>
+              </div>
+              {selectedSubjectIds.length === 0 && (
+                <p className="text-xs text-muted-foreground">Select subjects first to assign classes.</p>
+              )}
+              {assignmentFields.map((af, index) => {
+                const currentClassId = form.watch(`classAssignments.${index}.classId`);
+                return (
+                  <div key={af.id} className="rounded-md border p-3 space-y-3 relative">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={() => remove(index)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+
+                    {/* Class select grouped by level */}
+                    <FormField control={form.control} name={`classAssignments.${index}.classId`} render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Class</FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select class" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {levels.map((l: any) => {
+                              const lvlClasses = classes.filter((c: any) => c.levelId === l.id);
+                              if (lvlClasses.length === 0) return null;
+                              return (
+                                <div key={l.id}>
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{l.name}</div>
+                                  {lvlClasses.map((c: any) => {
+                                    const alreadyAssigned = assignedClassIds.includes(c.id) && c.id !== currentClassId;
+                                    return (
+                                      <SelectItem key={c.id} value={c.id} disabled={alreadyAssigned}>
+                                        {c.name} {alreadyAssigned ? '(already assigned)' : ''}
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    {/* Subject checkboxes - only from the teacher's selected subjects */}
+                    <FormField control={form.control} name={`classAssignments.${index}.subjectIds`} render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Subjects for this class</FormLabel>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedSubjectIds.map(sid => {
+                            const subj = subjects.find((s: any) => s.id === sid);
+                            if (!subj) return null;
+                            const checked = (field.value || []).includes(sid);
+                            return (
+                              <label key={sid} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={c => {
+                                    const v = field.value || [];
+                                    field.onChange(c ? [...v, sid] : v.filter((x: string) => x !== sid));
+                                  }}
+                                />
+                                {subj.name}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                );
+              })}
+            </div>
+
             <DynamicFormFields fields={fields} control={form.control} />
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

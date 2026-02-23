@@ -83,9 +83,9 @@ export const initialStudents: Student[] = [
 ];
 
 export const initialTeachers: Teacher[] = [
-  { id: 'tea-1', firstname: 'Alice', lastname: 'Cooper', subjectIds: ['sub-1', 'sub-2'], classIds: ['cls-1', 'cls-2'], dynamicFields: { email: 'alice.cooper@school.com', phone: '+1 555 1001', qualification: 'M.Ed Mathematics', experience_years: '8' }, createdAt: '2024-01-05T08:00:00Z' },
-  { id: 'tea-2', firstname: 'Bob', lastname: 'Martin', subjectIds: ['sub-3'], classIds: ['cls-3', 'cls-4'], dynamicFields: { email: 'bob.martin@school.com', qualification: 'PhD Science', experience_years: '12' }, createdAt: '2024-01-05T08:00:00Z' },
-  { id: 'tea-3', firstname: 'Carol', lastname: 'Davis', subjectIds: ['sub-4', 'sub-5'], classIds: ['cls-5', 'cls-6'], dynamicFields: { email: 'carol.davis@school.com', phone: '+1 555 1003', experience_years: '5' }, createdAt: '2024-01-06T08:00:00Z' },
+  { id: 'tea-1', firstname: 'Alice', lastname: 'Cooper', subjectIds: ['sub-1', 'sub-2'], classAssignments: [{ classId: 'cls-1', subjectIds: ['sub-1'] }, { classId: 'cls-2', subjectIds: ['sub-1', 'sub-2'] }], dynamicFields: { email: 'alice.cooper@school.com', phone: '+1 555 1001', qualification: 'M.Ed Mathematics', experience_years: '8' }, createdAt: '2024-01-05T08:00:00Z' },
+  { id: 'tea-2', firstname: 'Bob', lastname: 'Martin', subjectIds: ['sub-3'], classAssignments: [{ classId: 'cls-3', subjectIds: ['sub-3'] }, { classId: 'cls-4', subjectIds: ['sub-3'] }], dynamicFields: { email: 'bob.martin@school.com', qualification: 'PhD Science', experience_years: '12' }, createdAt: '2024-01-05T08:00:00Z' },
+  { id: 'tea-3', firstname: 'Carol', lastname: 'Davis', subjectIds: ['sub-4', 'sub-5'], classAssignments: [{ classId: 'cls-5', subjectIds: ['sub-4'] }, { classId: 'cls-6', subjectIds: ['sub-4', 'sub-5'] }], dynamicFields: { email: 'carol.davis@school.com', phone: '+1 555 1003', experience_years: '5' }, createdAt: '2024-01-06T08:00:00Z' },
 ];
 
 export const initialManagers: Manager[] = [
