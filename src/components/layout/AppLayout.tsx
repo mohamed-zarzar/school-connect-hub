@@ -11,7 +11,7 @@ export function AppLayout() {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <main className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center border-b bg-card px-4 shrink-0 gap-4">
+          <header className="h-14 flex items-center border-b border-border bg-card px-4 shrink-0 gap-4 shadow-sm">
             <SidebarTrigger />
             <GlobalSearch />
             <QRScanner />
