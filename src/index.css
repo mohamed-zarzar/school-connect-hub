@@ -24,14 +24,14 @@
     --input: 220 13% 90%;
     --ring: 217 91% 60%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 172 66% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 91% 95%;
-    --sidebar-accent-foreground: 217 70% 40%;
-    --sidebar-border: 220 13% 92%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 222 40% 16%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 222 40% 16%;
+    --sidebar-ring: 172 66% 50%;
   }
 
   .dark {
