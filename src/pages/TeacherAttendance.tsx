@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Trash2, Pencil, Download, Upload, UserX, Clock, BarChart3, ListPlus, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
-import { teacherAttendanceApi, SESSION_OPTIONS } from '@/services/attendance-api';
+import { teacherAttendanceApi, getSessionOptions } from '@/services/attendance-api';
 import { teacherApi, classApi, levelApi } from '@/services/api';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { exportToExcel } from '@/lib/excel-utils';
@@ -38,14 +38,15 @@ export default function TeacherAttendance() {
   const [editingAbsence, setEditingAbsence] = useState<TeacherAbsence | null>(null);
   const [editingLate, setEditingLate] = useState<TeacherLate | null>(null);
 
+  const sessionOptions = getSessionOptions();
   const [formTeacherId, setFormTeacherId] = useState('');
-  const [formSession, setFormSession] = useState(SESSION_OPTIONS[0]);
+  const [formSession, setFormSession] = useState(sessionOptions[0]);
   const [formDate, setFormDate] = useState(today());
   const [formJustified, setFormJustified] = useState(false);
   const [formReason, setFormReason] = useState('');
   const [formPeriod, setFormPeriod] = useState(10);
 
-  const [bulkRows, setBulkRows] = useState<{ teacherId: string; session: string; date: string; isJustified: boolean; reason?: string; period?: number }[]>([{ teacherId: '', session: SESSION_OPTIONS[0], date: today(), isJustified: false, period: 10 }]);
+  const [bulkRows, setBulkRows] = useState<{ teacherId: string; session: string; date: string; isJustified: boolean; reason?: string; period?: number }[]>([{ teacherId: '', session: sessionOptions[0], date: today(), isJustified: false, period: 10 }]);
 
   const { data: teachersRes } = useQuery({ queryKey: ['teachers-all'], queryFn: () => teacherApi.getAll({ page: 1, limit: 1000 }) });
   const { data: classesRes } = useQuery({ queryKey: ['classes-all'], queryFn: () => classApi.getAll({ page: 1, limit: 1000 }) });
@@ -104,8 +105,8 @@ export default function TeacherAttendance() {
 
   const getTeacherName = (id: string) => { const t = teachers.find(x => x.id === id); return t ? `${t.firstname} ${t.lastname}` : id; };
 
-  const resetAbsForm = (a?: TeacherAbsence) => { setFormTeacherId(a?.teacherId || ''); setFormSession(a?.session || SESSION_OPTIONS[0]); setFormDate(a?.date || today()); setFormJustified(a?.isJustified || false); setFormReason(a?.reason || ''); };
-  const resetLateForm = (l?: TeacherLate) => { setFormTeacherId(l?.teacherId || ''); setFormSession(l?.session || SESSION_OPTIONS[0]); setFormDate(l?.date || today()); setFormJustified(l?.isJustified || false); setFormReason(l?.reason || ''); setFormPeriod(l?.period || 10); };
+  const resetAbsForm = (a?: TeacherAbsence) => { setFormTeacherId(a?.teacherId || ''); setFormSession(a?.session || sessionOptions[0]); setFormDate(a?.date || today()); setFormJustified(a?.isJustified || false); setFormReason(a?.reason || ''); };
+  const resetLateForm = (l?: TeacherLate) => { setFormTeacherId(l?.teacherId || ''); setFormSession(l?.session || sessionOptions[0]); setFormDate(l?.date || today()); setFormJustified(l?.isJustified || false); setFormReason(l?.reason || ''); setFormPeriod(l?.period || 10); };
 
   const handleAbsSubmit = () => {
     if (!formTeacherId) { toast.error('Select a teacher'); return; }
@@ -128,25 +129,24 @@ export default function TeacherAttendance() {
     setDeleteTarget(null);
   };
 
-  // QR Scan handlers
   const handleScanSingleAbs = (ids: string[]) => { if (ids[0]) { resetAbsForm(); setFormTeacherId(ids[0]); setAbsDialog(true); } };
   const handleScanSingleLate = (ids: string[]) => { if (ids[0]) { resetLateForm(); setFormTeacherId(ids[0]); setLateDialog(true); } };
-  const handleScanBulkAbs = (ids: string[]) => { setBulkRows(ids.map(id => ({ teacherId: id, session: SESSION_OPTIONS[0], date: today(), isJustified: false }))); setBulkAbsDialog(true); };
-  const handleScanBulkLate = (ids: string[]) => { setBulkRows(ids.map(id => ({ teacherId: id, session: SESSION_OPTIONS[0], date: today(), isJustified: false, period: 10 }))); setBulkLateDialog(true); };
+  const handleScanBulkAbs = (ids: string[]) => { setBulkRows(ids.map(id => ({ teacherId: id, session: sessionOptions[0], date: today(), isJustified: false }))); setBulkAbsDialog(true); };
+  const handleScanBulkLate = (ids: string[]) => { setBulkRows(ids.map(id => ({ teacherId: id, session: sessionOptions[0], date: today(), isJustified: false, period: 10 }))); setBulkLateDialog(true); };
 
   const handleImportAbsences = (rows: Record<string, string>[]) => {
-    const records = rows.map(r => ({ teacherId: r['Teacher ID'] || r['teacherId'] || '', session: r['Session'] || r['session'] || SESSION_OPTIONS[0], date: r['Date'] || r['date'] || today(), isJustified: r['Justified']?.toLowerCase() === 'yes' || r['isJustified']?.toLowerCase() === 'true', reason: r['Reason'] || r['reason'] || undefined })).filter(r => r.teacherId);
+    const records = rows.map(r => ({ teacherId: r['Teacher ID'] || r['teacherId'] || '', session: r['Session'] || r['session'] || sessionOptions[0], date: r['Date'] || r['date'] || today(), isJustified: r['Justified']?.toLowerCase() === 'yes' || r['isJustified']?.toLowerCase() === 'true', reason: r['Reason'] || r['reason'] || undefined })).filter(r => r.teacherId);
     if (!records.length) { toast.error('No valid records'); return; }
     bulkAbsMut.mutate(records);
   };
 
   const handleImportLates = (rows: Record<string, string>[]) => {
-    const records = rows.map(r => ({ teacherId: r['Teacher ID'] || r['teacherId'] || '', session: r['Session'] || r['session'] || SESSION_OPTIONS[0], date: r['Date'] || r['date'] || today(), isJustified: r['Justified']?.toLowerCase() === 'yes' || r['isJustified']?.toLowerCase() === 'true', reason: r['Reason'] || r['reason'] || undefined, period: parseInt(r['Period'] || r['period'] || '10') || 10 })).filter(r => r.teacherId);
+    const records = rows.map(r => ({ teacherId: r['Teacher ID'] || r['teacherId'] || '', session: r['Session'] || r['session'] || sessionOptions[0], date: r['Date'] || r['date'] || today(), isJustified: r['Justified']?.toLowerCase() === 'yes' || r['isJustified']?.toLowerCase() === 'true', reason: r['Reason'] || r['reason'] || undefined, period: parseInt(r['Period'] || r['period'] || '10') || 10 })).filter(r => r.teacherId);
     if (!records.length) { toast.error('No valid records'); return; }
     bulkLateMut.mutate(records);
   };
 
-  const addBulkRow = () => setBulkRows(prev => [...prev, { teacherId: '', session: SESSION_OPTIONS[0], date: today(), isJustified: false, period: 10 }]);
+  const addBulkRow = () => setBulkRows(prev => [...prev, { teacherId: '', session: sessionOptions[0], date: today(), isJustified: false, period: 10 }]);
   const removeBulkRow = (idx: number) => setBulkRows(prev => prev.filter((_, i) => i !== idx));
   const updateBulkRow = (idx: number, field: string, value: any) => setBulkRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
 
@@ -196,7 +196,7 @@ export default function TeacherAttendance() {
           <div className="flex gap-2 flex-wrap">
             <Button size="sm" onClick={() => { resetAbsForm(); setAbsDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Absence</Button>
             <AttendanceQRScanner entityType="teachers" mode="single" onScanned={handleScanSingleAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
-            <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ teacherId: '', session: SESSION_OPTIONS[0], date: today(), isJustified: false }]); setBulkAbsDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
+            <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ teacherId: '', session: sessionOptions[0], date: today(), isJustified: false }]); setBulkAbsDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
             <AttendanceQRScanner entityType="teachers" mode="bulk" onScanned={handleScanBulkAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportAbsOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
             <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredAbsences.map(a => ({ ...a, teacherName: getTeacherName(a.teacherId), justified: a.isJustified ? 'Yes' : 'No', reason: a.reason || '' })), [{ key: 'teacherName', label: 'Teacher' }, { key: 'session', label: 'Session' }, { key: 'date', label: 'Date' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'teacher-absences')}><Download className="mr-2 h-4 w-4" />Export</Button>
@@ -227,7 +227,7 @@ export default function TeacherAttendance() {
           <div className="flex gap-2 flex-wrap">
             <Button size="sm" onClick={() => { resetLateForm(); setLateDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Late</Button>
             <AttendanceQRScanner entityType="teachers" mode="single" onScanned={handleScanSingleLate} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
-            <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ teacherId: '', session: SESSION_OPTIONS[0], date: today(), isJustified: false, period: 10 }]); setBulkLateDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
+            <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ teacherId: '', session: sessionOptions[0], date: today(), isJustified: false, period: 10 }]); setBulkLateDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
             <AttendanceQRScanner entityType="teachers" mode="bulk" onScanned={handleScanBulkLate} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportLateOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
             <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredLates.map(l => ({ ...l, teacherName: getTeacherName(l.teacherId), justified: l.isJustified ? 'Yes' : 'No', periodStr: `${l.period} min`, reason: l.reason || '' })), [{ key: 'teacherName', label: 'Teacher' }, { key: 'session', label: 'Session' }, { key: 'date', label: 'Date' }, { key: 'periodStr', label: 'Period' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'teacher-lates')}><Download className="mr-2 h-4 w-4" />Export</Button>
@@ -273,7 +273,7 @@ export default function TeacherAttendance() {
           <DialogHeader><DialogTitle>{editingAbsence ? 'Edit Absence' : 'Add Absence'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Teacher</Label><Select value={formTeacherId} onValueChange={setFormTeacherId}><SelectTrigger><SelectValue placeholder="Select teacher" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.firstname} {t.lastname}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Session</Label><Select value={formSession} onValueChange={setFormSession}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SESSION_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label>Session</Label><Select value={formSession} onValueChange={setFormSession}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{sessionOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-2"><Label>Date</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
             <div className="flex items-center gap-2"><Switch checked={formJustified} onCheckedChange={v => { setFormJustified(v); if (!v) setFormReason(''); }} /><Label>Justified</Label></div>
             {formJustified && <div className="space-y-2"><Label>Reason</Label><Textarea value={formReason} onChange={e => setFormReason(e.target.value)} placeholder="Enter justification reason..." /></div>}
@@ -288,7 +288,7 @@ export default function TeacherAttendance() {
           <DialogHeader><DialogTitle>{editingLate ? 'Edit Late' : 'Add Late'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Teacher</Label><Select value={formTeacherId} onValueChange={setFormTeacherId}><SelectTrigger><SelectValue placeholder="Select teacher" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.firstname} {t.lastname}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Session</Label><Select value={formSession} onValueChange={setFormSession}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{SESSION_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label>Session</Label><Select value={formSession} onValueChange={setFormSession}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{sessionOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-2"><Label>Date</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
             <div className="space-y-2"><Label>Period of Late (minutes)</Label><Input type="number" min={1} value={formPeriod} onChange={e => setFormPeriod(parseInt(e.target.value) || 0)} /></div>
             <div className="flex items-center gap-2"><Switch checked={formJustified} onCheckedChange={v => { setFormJustified(v); if (!v) setFormReason(''); }} /><Label>Justified</Label></div>
@@ -306,7 +306,7 @@ export default function TeacherAttendance() {
             {bulkRows.map((row, idx) => (
               <div key={idx} className="flex gap-2 items-end flex-wrap border-b border-border pb-2">
                 <div className="flex-1 min-w-[140px] space-y-1"><Label className="text-xs">Teacher</Label><Select value={row.teacherId} onValueChange={v => updateBulkRow(idx, 'teacherId', v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.firstname} {t.lastname}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-1"><Label className="text-xs">Session</Label><Select value={row.session} onValueChange={v => updateBulkRow(idx, 'session', v)}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent>{SESSION_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-1"><Label className="text-xs">Session</Label><Select value={row.session} onValueChange={v => updateBulkRow(idx, 'session', v)}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent>{sessionOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={row.date} onChange={e => updateBulkRow(idx, 'date', e.target.value)} className="w-36" /></div>
                 <div className="flex items-center gap-1 pb-1"><Switch checked={row.isJustified} onCheckedChange={v => { updateBulkRow(idx, 'isJustified', v); if (!v) updateBulkRow(idx, 'reason', ''); }} /><Label className="text-xs">J</Label></div>
                 {row.isJustified && <div className="w-full space-y-1"><Label className="text-xs">Reason</Label><Input value={row.reason || ''} onChange={e => updateBulkRow(idx, 'reason', e.target.value)} placeholder="Reason..." /></div>}
@@ -327,7 +327,7 @@ export default function TeacherAttendance() {
             {bulkRows.map((row, idx) => (
               <div key={idx} className="flex gap-2 items-end flex-wrap border-b border-border pb-2">
                 <div className="flex-1 min-w-[140px] space-y-1"><Label className="text-xs">Teacher</Label><Select value={row.teacherId} onValueChange={v => updateBulkRow(idx, 'teacherId', v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.firstname} {t.lastname}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-1"><Label className="text-xs">Session</Label><Select value={row.session} onValueChange={v => updateBulkRow(idx, 'session', v)}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent>{SESSION_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-1"><Label className="text-xs">Session</Label><Select value={row.session} onValueChange={v => updateBulkRow(idx, 'session', v)}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent>{sessionOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={row.date} onChange={e => updateBulkRow(idx, 'date', e.target.value)} className="w-36" /></div>
                 <div className="space-y-1"><Label className="text-xs">Min</Label><Input type="number" min={1} value={row.period ?? 10} onChange={e => updateBulkRow(idx, 'period', parseInt(e.target.value) || 0)} className="w-20" /></div>
                 <div className="flex items-center gap-1 pb-1"><Switch checked={row.isJustified} onCheckedChange={v => { updateBulkRow(idx, 'isJustified', v); if (!v) updateBulkRow(idx, 'reason', ''); }} /><Label className="text-xs">J</Label></div>

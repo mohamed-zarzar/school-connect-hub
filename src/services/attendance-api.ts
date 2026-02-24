@@ -380,13 +380,5 @@ export const managerAttendanceApi = {
   },
 };
 
-export const SESSION_OPTIONS = [
-  'Session 1 - 08:00',
-  'Session 2 - 09:00',
-  'Session 3 - 10:00',
-  'Session 4 - 11:00',
-  'Session 5 - 13:00',
-  'Session 6 - 14:00',
-  'Session 7 - 15:00',
-  'Session 8 - 16:00',
-];
+export { getSessionOptions } from './settings-api';
+

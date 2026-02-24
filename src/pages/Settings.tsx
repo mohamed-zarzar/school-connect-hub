@@ -6,10 +6,11 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { templateApi } from '@/services/api';
+import { settingsApi, type PredefinedSettings } from '@/services/settings-api';
 import { defaultTemplates } from '@/services/mock-data';
 import type { EntityType, FieldDefinition, FieldType, EntityTemplateConfig } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,34 @@ function SortableFieldCard({ field, onEdit, onDelete }: { field: FieldDefinition
 }
 
 export default function SettingsPage() {
+  const [settingsTab, setSettingsTab] = useState('templates');
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="text-muted-foreground">Configure templates and predefined lists.</p>
+      </div>
+
+      <Tabs value={settingsTab} onValueChange={setSettingsTab}>
+        <TabsList>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="predefined">Predefined Lists</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="templates">
+          <TemplatesTab />
+        </TabsContent>
+
+        <TabsContent value="predefined">
+          <PredefinedListsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function TemplatesTab() {
   const qc = useQueryClient();
   const [activeEntity, setActiveEntity] = useState<EntityType>('student');
   const [localFields, setLocalFields] = useState<FieldDefinition[]>([]);
@@ -111,10 +140,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Template Settings</h1>
-          <p className="text-muted-foreground">Configure dynamic fields for each entity type. Drag to reorder.</p>
-        </div>
+        <p className="text-sm text-muted-foreground">Configure dynamic fields for each entity type. Drag to reorder.</p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => { if (tplRes?.data) { const def = JSON.parse(JSON.stringify((defaultTemplates as any)[activeEntity].fields)); setLocalFields(def); toast.info('Reset to defaults — click Save to apply'); } }}>Reset to Default</Button>
           <Button onClick={handleSave} disabled={saveMut.isPending}>{saveMut.isPending ? 'Saving...' : 'Save Template'}</Button>
@@ -173,10 +199,82 @@ export default function SettingsPage() {
 
       <AlertDialog open={!!deleteFieldName} onOpenChange={o => !o && setDeleteFieldName(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Remove field?</AlertDialogTitle><AlertDialogDescription>This will remove the "{deleteFieldName}" field from the template. Existing data for this field will be preserved but hidden.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Remove field?</AlertDialogTitle><AlertDialogDescription>This will remove the "{deleteFieldName}" field from the template.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => removeField(deleteFieldName!)}>Remove</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function PredefinedListsTab() {
+  const qc = useQueryClient();
+  const { data: settingsRes } = useQuery({ queryKey: ['predefined-settings'], queryFn: () => settingsApi.getPredefined() });
+  const [sessions, setSessions] = useState<string[]>([]);
+  const [newSession, setNewSession] = useState('');
+
+  useEffect(() => {
+    if (settingsRes?.data) setSessions([...settingsRes.data.sessions]);
+  }, [settingsRes]);
+
+  const saveMut = useMutation({
+    mutationFn: (data: PredefinedSettings) => settingsApi.updatePredefined(data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['predefined-settings'] }); toast.success('Predefined lists saved'); },
+  });
+
+  const addSession = () => {
+    if (!newSession.trim()) return;
+    if (sessions.includes(newSession.trim())) { toast.error('Session already exists'); return; }
+    setSessions(prev => [...prev, newSession.trim()]);
+    setNewSession('');
+  };
+
+  const removeSession = (idx: number) => {
+    setSessions(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSave = () => {
+    saveMut.mutate({ sessions });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">Configure predefined lists used across the application.</p>
+        <Button onClick={handleSave} disabled={saveMut.isPending}>{saveMut.isPending ? 'Saving...' : 'Save Settings'}</Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Session Numbers</CardTitle>
+          <p className="text-sm text-muted-foreground">Define the session options available for teacher attendance tracking.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            {sessions.map((session, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input
+                  value={session}
+                  onChange={e => setSessions(prev => prev.map((s, i) => i === idx ? e.target.value : s))}
+                  className="flex-1"
+                />
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => removeSession(idx)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={newSession}
+              onChange={e => setNewSession(e.target.value)}
+              placeholder="e.g. Session 9 - 17:00"
+              onKeyDown={e => e.key === 'Enter' && addSession()}
+            />
+            <Button variant="outline" onClick={addSession}><Plus className="mr-2 h-4 w-4" />Add</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
