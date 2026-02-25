@@ -20,6 +20,10 @@ import Settings from "./pages/Settings";
 import StudentAttendance from "./pages/StudentAttendance";
 import TeacherAttendance from "./pages/TeacherAttendance";
 import ManagerAttendance from "./pages/ManagerAttendance";
+import ExamLessons from "./pages/Lessons";
+import ExamQuestions from "./pages/Questions";
+import ExamsList from "./pages/Exams";
+import TakeExam from "./pages/TakeExam";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +51,10 @@ const App = () => (
             <Route path="/attendance/students" element={<StudentAttendance />} />
             <Route path="/attendance/teachers" element={<TeacherAttendance />} />
             <Route path="/attendance/managers" element={<ManagerAttendance />} />
+            <Route path="/lessons" element={<ExamLessons />} />
+            <Route path="/questions" element={<ExamQuestions />} />
+            <Route path="/exams" element={<ExamsList />} />
+            <Route path="/exams/:id/take" element={<TakeExam />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />
