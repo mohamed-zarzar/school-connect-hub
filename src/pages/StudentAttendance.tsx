@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Trash2, Pencil, Download, Upload, UserX, Clock, BarChart3, ListPlus, ScanLine } from 'lucide-react';
+import { AttendanceCalendarView } from '@/components/AttendanceCalendarView';
+import { ViewToggle } from '@/components/ViewToggle';
 import { toast } from 'sonner';
 import { studentAttendanceApi } from '@/services/attendance-api';
 import { studentApi, classApi, levelApi } from '@/services/api';
@@ -38,6 +40,8 @@ export default function StudentAttendance() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'absence' | 'late' } | null>(null);
   const [editingAbsence, setEditingAbsence] = useState<StudentAbsence | null>(null);
   const [editingLate, setEditingLate] = useState<StudentLate | null>(null);
+  const [absView, setAbsView] = useState<'table' | 'calendar'>('table');
+  const [lateView, setLateView] = useState<'table' | 'calendar'>('table');
 
   // Form state
   const [formStudentId, setFormStudentId] = useState('');
@@ -67,17 +71,19 @@ export default function StudentAttendance() {
 
   const filteredAbsences = useMemo(() => {
     let items = absences;
+    if (filter.entityId) { items = items.filter(i => i.studentId === filter.entityId); }
     if (filter.classId) { const ids = students.filter(s => s.classId === filter.classId).map(s => s.id); items = items.filter(i => ids.includes(i.studentId)); }
     if (filter.levelId) { const ids = students.filter(s => s.levelId === filter.levelId).map(s => s.id); items = items.filter(i => ids.includes(i.studentId)); }
     return items;
-  }, [absences, filter.classId, filter.levelId, students]);
+  }, [absences, filter.entityId, filter.classId, filter.levelId, students]);
 
   const filteredLates = useMemo(() => {
     let items = lates;
+    if (filter.entityId) { items = items.filter(i => i.studentId === filter.entityId); }
     if (filter.classId) { const ids = students.filter(s => s.classId === filter.classId).map(s => s.id); items = items.filter(i => ids.includes(i.studentId)); }
     if (filter.levelId) { const ids = students.filter(s => s.levelId === filter.levelId).map(s => s.id); items = items.filter(i => ids.includes(i.studentId)); }
     return items;
-  }, [lates, filter.classId, filter.levelId, students]);
+  }, [lates, filter.entityId, filter.classId, filter.levelId, students]);
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['student-absences'] }); qc.invalidateQueries({ queryKey: ['student-lates'] }); qc.invalidateQueries({ queryKey: ['student-attendance-stats'] }); };
 
@@ -196,6 +202,13 @@ export default function StudentAttendance() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Student</Label>
+              <Select value={filter.entityId || 'all'} onValueChange={v => setFilter(f => ({ ...f, entityId: v === 'all' ? undefined : v }))}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All Students</SelectItem>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.firstname} {s.lastname}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1"><Label className="text-xs">Date From</Label><Input type="date" value={filter.dateFrom || ''} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value || undefined }))} className="w-40" /></div>
             <div className="space-y-1"><Label className="text-xs">Date To</Label><Input type="date" value={filter.dateTo || ''} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value || undefined }))} className="w-40" /></div>
             <div className="space-y-1">
@@ -225,15 +238,24 @@ export default function StudentAttendance() {
         </TabsList>
 
         <TabsContent value="absences" className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <Button size="sm" onClick={() => { resetAbsForm(); setAbsDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Absence</Button>
             <AttendanceQRScanner entityType="students" mode="single" onScanned={handleScanSingleAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
             <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ studentId: '', date: today(), isJustified: false }]); setBulkAbsDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
             <AttendanceQRScanner entityType="students" mode="bulk" onScanned={handleScanBulkAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportAbsOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
             <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredAbsences.map(a => ({ ...a, studentName: getStudentName(a.studentId), justified: a.isJustified ? 'Yes' : 'No', reason: a.reason || '' })), [{ key: 'studentName', label: 'Student' }, { key: 'date', label: 'Date' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'student-absences')}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <div className="ml-auto"><ViewToggle view={absView} onViewChange={setAbsView} /></div>
           </div>
-          {absLoading ? <Skeleton className="h-48 w-full" /> : (
+          {absLoading ? <Skeleton className="h-48 w-full" /> : absView === 'calendar' ? (
+            <AttendanceCalendarView
+              items={filteredAbsences}
+              type="absences"
+              getEntityName={(item) => getStudentName(item.studentId)}
+              onEdit={(item) => { resetAbsForm(item as any); setEditingAbsence(item as any); }}
+              onDelete={(item) => setDeleteTarget({ id: item.id, type: 'absence' })}
+            />
+          ) : (
             <div className="rounded-md border overflow-auto">
               <Table>
                 <TableHeader>
@@ -264,15 +286,24 @@ export default function StudentAttendance() {
         </TabsContent>
 
         <TabsContent value="lates" className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <Button size="sm" onClick={() => { resetLateForm(); setLateDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Late</Button>
             <AttendanceQRScanner entityType="students" mode="single" onScanned={handleScanSingleLate} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
             <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ studentId: '', date: today(), isJustified: false, period: 10 }]); setBulkLateDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
             <AttendanceQRScanner entityType="students" mode="bulk" onScanned={handleScanBulkLate} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportLateOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
             <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredLates.map(l => ({ ...l, studentName: getStudentName(l.studentId), justified: l.isJustified ? 'Yes' : 'No', periodStr: `${l.period} min`, reason: l.reason || '' })), [{ key: 'studentName', label: 'Student' }, { key: 'date', label: 'Date' }, { key: 'periodStr', label: 'Period' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'student-lates')}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <div className="ml-auto"><ViewToggle view={lateView} onViewChange={setLateView} /></div>
           </div>
-          {lateLoading ? <Skeleton className="h-48 w-full" /> : (
+          {lateLoading ? <Skeleton className="h-48 w-full" /> : lateView === 'calendar' ? (
+            <AttendanceCalendarView
+              items={filteredLates}
+              type="lates"
+              getEntityName={(item) => getStudentName(item.studentId)}
+              onEdit={(item) => { resetLateForm(item as any); setEditingLate(item as any); }}
+              onDelete={(item) => setDeleteTarget({ id: item.id, type: 'late' })}
+            />
+          ) : (
             <div className="rounded-md border overflow-auto">
               <Table>
                 <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Date</TableHead><TableHead>Period (min)</TableHead><TableHead>Justified</TableHead><TableHead>Reason</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>

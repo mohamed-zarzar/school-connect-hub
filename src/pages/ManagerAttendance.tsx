@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Trash2, Pencil, Download, Upload, UserX, Clock, BarChart3, ListPlus, ScanLine } from 'lucide-react';
+import { AttendanceCalendarView } from '@/components/AttendanceCalendarView';
+import { ViewToggle } from '@/components/ViewToggle';
 import { toast } from 'sonner';
 import { managerAttendanceApi } from '@/services/attendance-api';
 import { managerApi } from '@/services/api';
@@ -37,6 +39,8 @@ export default function ManagerAttendance() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'absence' | 'late' } | null>(null);
   const [editingAbsence, setEditingAbsence] = useState<ManagerAbsence | null>(null);
   const [editingLate, setEditingLate] = useState<ManagerLate | null>(null);
+  const [absView, setAbsView] = useState<'table' | 'calendar'>('table');
+  const [lateView, setLateView] = useState<'table' | 'calendar'>('table');
 
   const [formManagerId, setFormManagerId] = useState('');
   const [formDate, setFormDate] = useState(today());
@@ -56,6 +60,18 @@ export default function ManagerAttendance() {
   const absences = absencesRes?.data || [];
   const lates = latesRes?.data || [];
   const stats = statsRes?.data;
+
+  const filteredAbsences = useMemo(() => {
+    let items = absences;
+    if (filter.entityId) items = items.filter(i => i.managerId === filter.entityId);
+    return items;
+  }, [absences, filter.entityId]);
+
+  const filteredLates = useMemo(() => {
+    let items = lates;
+    if (filter.entityId) items = items.filter(i => i.managerId === filter.entityId);
+    return items;
+  }, [lates, filter.entityId]);
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['manager-absences'] }); qc.invalidateQueries({ queryKey: ['manager-lates'] }); qc.invalidateQueries({ queryKey: ['manager-attendance-stats'] }); };
 
@@ -136,6 +152,13 @@ export default function ManagerAttendance() {
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Manager</Label>
+              <Select value={filter.entityId || 'all'} onValueChange={v => setFilter(f => ({ ...f, entityId: v === 'all' ? undefined : v }))}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>{<SelectItem value="all">All Managers</SelectItem>}{managers.map(m => <SelectItem key={m.id} value={m.id}>{m.firstname} {m.lastname}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1"><Label className="text-xs">Date From</Label><Input type="date" value={filter.dateFrom || ''} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value || undefined }))} className="w-40" /></div>
             <div className="space-y-1"><Label className="text-xs">Date To</Label><Input type="date" value={filter.dateTo || ''} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value || undefined }))} className="w-40" /></div>
             <div className="flex items-end"><Button variant="outline" size="sm" onClick={() => setFilter({})}>Clear Filters</Button></div>
@@ -145,27 +168,36 @@ export default function ManagerAttendance() {
 
       <Tabs value={tab} onValueChange={v => setTab(v as any)}>
         <TabsList>
-          <TabsTrigger value="absences" className="gap-2"><UserX className="h-4 w-4" />Absences ({absences.length})</TabsTrigger>
-          <TabsTrigger value="lates" className="gap-2"><Clock className="h-4 w-4" />Lates ({lates.length})</TabsTrigger>
+          <TabsTrigger value="absences" className="gap-2"><UserX className="h-4 w-4" />Absences ({filteredAbsences.length})</TabsTrigger>
+          <TabsTrigger value="lates" className="gap-2"><Clock className="h-4 w-4" />Lates ({filteredLates.length})</TabsTrigger>
           <TabsTrigger value="stats" className="gap-2"><BarChart3 className="h-4 w-4" />Statistics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="absences" className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <Button size="sm" onClick={() => { resetAbsForm(); setAbsDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Absence</Button>
             <AttendanceQRScanner entityType="managers" mode="single" onScanned={handleScanSingleAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
             <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ managerId: '', date: today(), isJustified: false }]); setBulkAbsDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
             <AttendanceQRScanner entityType="managers" mode="bulk" onScanned={handleScanBulkAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportAbsOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
-            <Button size="sm" variant="outline" onClick={() => exportToExcel(absences.map(a => ({ ...a, managerName: getManagerName(a.managerId), justified: a.isJustified ? 'Yes' : 'No', reason: a.reason || '' })), [{ key: 'managerName', label: 'Manager' }, { key: 'date', label: 'Date' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'manager-absences')}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredAbsences.map(a => ({ ...a, managerName: getManagerName(a.managerId), justified: a.isJustified ? 'Yes' : 'No', reason: a.reason || '' })), [{ key: 'managerName', label: 'Manager' }, { key: 'date', label: 'Date' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'manager-absences')}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <div className="ml-auto"><ViewToggle view={absView} onViewChange={setAbsView} /></div>
           </div>
-          {absLoading ? <Skeleton className="h-48 w-full" /> : (
+          {absLoading ? <Skeleton className="h-48 w-full" /> : absView === 'calendar' ? (
+            <AttendanceCalendarView
+              items={filteredAbsences}
+              type="absences"
+              getEntityName={(item) => getManagerName(item.managerId)}
+              onEdit={(item) => { resetAbsForm(item as any); setEditingAbsence(item as any); }}
+              onDelete={(item) => setDeleteTarget({ id: item.id, type: 'absence' })}
+            />
+          ) : (
             <div className="rounded-md border overflow-auto">
               <Table>
                 <TableHeader><TableRow><TableHead>Manager</TableHead><TableHead>Date</TableHead><TableHead>Justified</TableHead><TableHead>Reason</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {absences.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No absences found</TableCell></TableRow> :
-                    absences.map(a => (
+                  {filteredAbsences.length === 0 ? <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No absences found</TableCell></TableRow> :
+                    filteredAbsences.map(a => (
                       <TableRow key={a.id}>
                         <TableCell>{getManagerName(a.managerId)}</TableCell>
                         <TableCell>{a.date}</TableCell>
@@ -181,21 +213,30 @@ export default function ManagerAttendance() {
         </TabsContent>
 
         <TabsContent value="lates" className="space-y-4">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <Button size="sm" onClick={() => { resetLateForm(); setLateDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Late</Button>
             <AttendanceQRScanner entityType="managers" mode="single" onScanned={handleScanSingleLate} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
             <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ managerId: '', date: today(), isJustified: false, period: 10 }]); setBulkLateDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
             <AttendanceQRScanner entityType="managers" mode="bulk" onScanned={handleScanBulkLate} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportLateOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
-            <Button size="sm" variant="outline" onClick={() => exportToExcel(lates.map(l => ({ ...l, managerName: getManagerName(l.managerId), justified: l.isJustified ? 'Yes' : 'No', periodStr: `${l.period} min`, reason: l.reason || '' })), [{ key: 'managerName', label: 'Manager' }, { key: 'date', label: 'Date' }, { key: 'periodStr', label: 'Period' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'manager-lates')}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredLates.map(l => ({ ...l, managerName: getManagerName(l.managerId), justified: l.isJustified ? 'Yes' : 'No', periodStr: `${l.period} min`, reason: l.reason || '' })), [{ key: 'managerName', label: 'Manager' }, { key: 'date', label: 'Date' }, { key: 'periodStr', label: 'Period' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'manager-lates')}><Download className="mr-2 h-4 w-4" />Export</Button>
+            <div className="ml-auto"><ViewToggle view={lateView} onViewChange={setLateView} /></div>
           </div>
-          {lateLoading ? <Skeleton className="h-48 w-full" /> : (
+          {lateLoading ? <Skeleton className="h-48 w-full" /> : lateView === 'calendar' ? (
+            <AttendanceCalendarView
+              items={filteredLates}
+              type="lates"
+              getEntityName={(item) => getManagerName(item.managerId)}
+              onEdit={(item) => { resetLateForm(item as any); setEditingLate(item as any); }}
+              onDelete={(item) => setDeleteTarget({ id: item.id, type: 'late' })}
+            />
+          ) : (
             <div className="rounded-md border overflow-auto">
               <Table>
                 <TableHeader><TableRow><TableHead>Manager</TableHead><TableHead>Date</TableHead><TableHead>Period</TableHead><TableHead>Justified</TableHead><TableHead>Reason</TableHead><TableHead className="w-24">Actions</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {lates.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No lates found</TableCell></TableRow> :
-                    lates.map(l => (
+                  {filteredLates.length === 0 ? <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No lates found</TableCell></TableRow> :
+                    filteredLates.map(l => (
                       <TableRow key={l.id}>
                         <TableCell>{getManagerName(l.managerId)}</TableCell>
                         <TableCell>{l.date}</TableCell>
