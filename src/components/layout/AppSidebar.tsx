@@ -20,6 +20,7 @@ const managementItems = [
   { title: 'Classes', url: '/classes', icon: School },
   { title: 'Levels', url: '/levels', icon: Layers },
   { title: 'Subjects', url: '/subjects', icon: BookOpen },
+  { title: 'Lessons', url: '/lessons', icon: Library },
 ];
 
 const attendanceItems = [
@@ -29,7 +30,6 @@ const attendanceItems = [
 ];
 
 const examItems = [
-  { title: 'Lessons', url: '/lessons', icon: Library },
   { title: 'Questions', url: '/questions', icon: FileQuestion },
   { title: 'Exams', url: '/exams', icon: FileText },
 ];
