@@ -15,7 +15,9 @@ import Managers from "./pages/Managers";
 import ManagerDetail from "./pages/ManagerDetail";
 import Classes from "./pages/Classes";
 import Levels from "./pages/Levels";
+import LevelDetail from "./pages/LevelDetail";
 import Subjects from "./pages/Subjects";
+import SubjectDetail from "./pages/SubjectDetail";
 import Settings from "./pages/Settings";
 import StudentAttendance from "./pages/StudentAttendance";
 import TeacherAttendance from "./pages/TeacherAttendance";
@@ -47,7 +49,10 @@ const App = () => (
             <Route path="/managers/:id" element={<ManagerDetail />} />
             <Route path="/classes" element={<Classes />} />
             <Route path="/levels" element={<Levels />} />
+            <Route path="/levels/:id" element={<LevelDetail />} />
             <Route path="/subjects" element={<Subjects />} />
+            <Route path="/subjects/:id" element={<SubjectDetail />} />
+            <Route path="/attendance/students" element={<StudentAttendance />} />
             <Route path="/attendance/students" element={<StudentAttendance />} />
             <Route path="/attendance/teachers" element={<TeacherAttendance />} />
             <Route path="/attendance/managers" element={<ManagerAttendance />} />
