@@ -1,12 +1,22 @@
 export type DifficultyLevel = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'true_false' | 'multiple_choice';
 
+export interface Unit {
+  id: string;
+  name: string;
+  subjectId: string;
+  levelId: string;
+  order: number;
+  createdAt: string;
+}
+
 export interface Lesson {
   id: string;
   name: string;
   description: string;
   subjectId: string;
   levelId: string;
+  unitId: string;
   order: number;
   createdAt: string;
 }
