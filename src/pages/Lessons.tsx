@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, BookOpen, GripVertical, ArrowLeft, FolderPlus, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, BookOpen, GripVertical, ArrowLeft, FolderPlus, ChevronRight, Layers, BookMarked } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import type { Lesson, Unit } from '@/types/exam';
@@ -41,19 +41,21 @@ function SortableLessonItem({ lesson, onEdit, onDelete, onViewQuestions }: {
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow group">
-      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card hover:border-primary/30 hover:shadow-sm transition-all duration-200 group">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors">
         <GripVertical className="h-4 w-4" />
       </button>
-      <Badge variant="outline" className="shrink-0 text-xs font-mono">{lesson.order}</Badge>
+      <div className="flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-primary text-xs font-bold shrink-0">
+        {lesson.order}
+      </div>
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm text-foreground truncate">{lesson.name}</p>
-        {lesson.description && <p className="text-xs text-muted-foreground truncate">{lesson.description}</p>}
+        {lesson.description && <p className="text-xs text-muted-foreground truncate mt-0.5">{lesson.description}</p>}
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onViewQuestions(lesson.id)}><BookOpen className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(lesson)}><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(lesson.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => onViewQuestions(lesson.id)}><BookOpen className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => onEdit(lesson)}><Pencil className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => onDelete(lesson.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
       </div>
     </div>
   );
@@ -87,20 +89,25 @@ function SortableUnitGroup({ unit, lessons, onEditLesson, onDeleteLesson, onView
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="rounded-xl border bg-card overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 border-b">
-        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+    <div ref={setNodeRef} style={style} className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors">
           <GripVertical className="h-4 w-4" />
         </button>
-        <Badge className="bg-primary/10 text-primary border-0">{unit.order}</Badge>
+        <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary/15 text-primary">
+          <Layers className="h-3.5 w-3.5" />
+        </div>
         <h3 className="font-semibold text-sm text-foreground flex-1">{unit.name}</h3>
-        <span className="text-xs text-muted-foreground">{lessons.length} lesson{lessons.length !== 1 ? 's' : ''}</span>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditUnit(unit)}><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDeleteUnit(unit.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+        <Badge variant="secondary" className="text-xs font-normal">{lessons.length} lesson{lessons.length !== 1 ? 's' : ''}</Badge>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => onEditUnit(unit)}><Pencil className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => onDeleteUnit(unit.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
       </div>
       <div className="p-3 space-y-2">
         {lessons.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No lessons in this unit</p>
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <BookMarked className="h-8 w-8 mb-2 opacity-30" />
+            <p className="text-sm">No lessons in this unit yet</p>
+          </div>
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd}>
             <SortableContext items={lessons.map(l => l.id)} strategy={verticalListSortingStrategy}>
@@ -117,24 +124,39 @@ function SortableUnitGroup({ unit, lessons, onEditLesson, onDeleteLesson, onView
 
 // ── Level Selection Step ──
 function LevelSelector({ levels, onSelect }: { levels: Level[]; onSelect: (l: Level) => void }) {
-  const colors = ['bg-emerald-500/10 text-emerald-700 border-emerald-200', 'bg-blue-500/10 text-blue-700 border-blue-200', 'bg-red-500/10 text-red-700 border-red-200', 'bg-amber-500/10 text-amber-700 border-amber-200', 'bg-purple-500/10 text-purple-700 border-purple-200'];
-  const emojis = ['🟢', '🔵', '🔴', '🟡', '🟣'];
+  const styles = [
+    { bg: 'bg-primary/5', border: 'border-primary/20', hover: 'hover:border-primary/40 hover:bg-primary/10', icon: '🎓', accent: 'text-primary' },
+    { bg: 'bg-accent/30', border: 'border-accent/40', hover: 'hover:border-accent/60 hover:bg-accent/50', icon: '📚', accent: 'text-accent-foreground' },
+    { bg: 'bg-destructive/5', border: 'border-destructive/20', hover: 'hover:border-destructive/40 hover:bg-destructive/10', icon: '🏆', accent: 'text-destructive' },
+    { bg: 'bg-secondary', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-secondary/80', icon: '⭐', accent: 'text-foreground' },
+    { bg: 'bg-muted/50', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-muted', icon: '🌟', accent: 'text-foreground' },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-xl font-bold text-foreground">Select a Level</h2>
-        <p className="text-sm text-muted-foreground mt-1">Choose a level to manage its lessons</p>
+    <div className="space-y-8 animate-fade-in">
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary/10 mb-2">
+          <Layers className="h-7 w-7 text-primary" />
+        </div>
+        <h2 className="text-2xl font-bold text-foreground">Select a Level</h2>
+        <p className="text-muted-foreground max-w-md mx-auto">Choose the education level to manage its curriculum and lessons</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {levels.map((level, i) => (
-          <button key={level.id} onClick={() => onSelect(level)}
-            className={`group p-6 rounded-xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] text-left ${colors[i % colors.length]}`}>
-            <span className="text-3xl">{emojis[i % emojis.length]}</span>
-            <h3 className="text-lg font-bold mt-3">{level.name}</h3>
-            <p className="text-xs mt-1 opacity-70">{level.description || 'Click to select'}</p>
-            <ChevronRight className="h-5 w-5 mt-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-          </button>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-4xl mx-auto">
+        {levels.map((level, i) => {
+          const s = styles[i % styles.length];
+          return (
+            <button key={level.id} onClick={() => onSelect(level)}
+              className={`group relative p-6 rounded-2xl border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 text-left ${s.bg} ${s.border} ${s.hover}`}>
+              <span className="text-4xl block">{s.icon}</span>
+              <h3 className={`text-lg font-bold mt-4 ${s.accent}`}>{level.name}</h3>
+              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{level.description || 'Click to explore lessons'}</p>
+              <div className="flex items-center gap-1.5 mt-4 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                <span>Explore</span>
+                <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform duration-200" />
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -142,27 +164,47 @@ function LevelSelector({ levels, onSelect }: { levels: Level[]; onSelect: (l: Le
 
 // ── Subject Selection Step ──
 function SubjectSelector({ subjects, levelName, onSelect, onBack }: { subjects: Subject[]; levelName: string; onSelect: (s: Subject) => void; onBack: () => void }) {
-  const emojis = ['📘', '🧪', '🌍', '📐', '🎨', '🎵', '💻', '📖'];
-  const colors = ['bg-blue-500/10 text-blue-700 border-blue-200', 'bg-green-500/10 text-green-700 border-green-200', 'bg-teal-500/10 text-teal-700 border-teal-200', 'bg-orange-500/10 text-orange-700 border-orange-200', 'bg-pink-500/10 text-pink-700 border-pink-200', 'bg-violet-500/10 text-violet-700 border-violet-200'];
+  const styles = [
+    { icon: '📘', bg: 'bg-primary/5', border: 'border-primary/20', hover: 'hover:border-primary/40 hover:bg-primary/10' },
+    { icon: '🧪', bg: 'bg-accent/30', border: 'border-accent/40', hover: 'hover:border-accent/60 hover:bg-accent/50' },
+    { icon: '🌍', bg: 'bg-secondary', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-secondary/80' },
+    { icon: '📐', bg: 'bg-destructive/5', border: 'border-destructive/20', hover: 'hover:border-destructive/40 hover:bg-destructive/10' },
+    { icon: '🎨', bg: 'bg-muted/50', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-muted' },
+    { icon: '🎵', bg: 'bg-primary/5', border: 'border-primary/20', hover: 'hover:border-primary/40 hover:bg-primary/10' },
+    { icon: '💻', bg: 'bg-accent/30', border: 'border-accent/40', hover: 'hover:border-accent/60 hover:bg-accent/50' },
+    { icon: '📖', bg: 'bg-secondary', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-secondary/80' },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
+    <div className="space-y-8 animate-fade-in">
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div>
-          <h2 className="text-xl font-bold text-foreground">Select a Subject</h2>
-          <p className="text-sm text-muted-foreground">Level: <Badge variant="outline">{levelName}</Badge></p>
+          <h2 className="text-2xl font-bold text-foreground">Select a Subject</h2>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-sm text-muted-foreground">Level:</span>
+            <Badge variant="secondary" className="font-medium">{levelName}</Badge>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {subjects.map((subject, i) => (
-          <button key={subject.id} onClick={() => onSelect(subject)}
-            className={`group p-6 rounded-xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] text-left ${colors[i % colors.length]}`}>
-            <span className="text-3xl">{emojis[i % emojis.length]}</span>
-            <h3 className="text-lg font-bold mt-3">{subject.name}</h3>
-            <p className="text-xs mt-1 opacity-70">{subject.code}</p>
-            <ChevronRight className="h-5 w-5 mt-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-          </button>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {subjects.map((subject, i) => {
+          const s = styles[i % styles.length];
+          return (
+            <button key={subject.id} onClick={() => onSelect(subject)}
+              className={`group relative p-6 rounded-2xl border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 text-left ${s.bg} ${s.border} ${s.hover}`}>
+              <span className="text-4xl block">{s.icon}</span>
+              <h3 className="text-lg font-bold mt-4 text-foreground">{subject.name}</h3>
+              <p className="text-xs text-muted-foreground mt-1.5">{subject.code}</p>
+              <div className="flex items-center gap-1.5 mt-4 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                <span>View lessons</span>
+                <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform duration-200" />
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -241,7 +283,7 @@ export default function Lessons() {
   });
   const createUnitMut = useMutation({
     mutationFn: (data: Omit<Unit, 'id' | 'createdAt'>) => unitApi.create(data),
-    onSuccess: (res) => { invalidate(); toast({ title: 'Unit created' }); setUnitDialogOpen(false); return res; },
+    onSuccess: () => { invalidate(); toast({ title: 'Unit created' }); setUnitDialogOpen(false); },
   });
   const updateUnitMut = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Unit> }) => unitApi.update(id, data),
@@ -326,25 +368,40 @@ export default function Lessons() {
 
   // ── Full lessons view ──
   const ungroupedLessons = groupedLessons['__ungrouped__'] ?? [];
+  const totalLessons = allLessons.length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedSubject(null)}><ArrowLeft className="h-4 w-4" /></Button>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={() => setSelectedSubject(null)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Lessons</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="cursor-pointer" onClick={() => { setSelectedLevel(null); setSelectedSubject(null); }}>{selectedLevel.name}</Badge>
-              <ChevronRight className="h-3 w-3 text-muted-foreground" />
-              <Badge variant="secondary" className="cursor-pointer" onClick={() => setSelectedSubject(null)}>{selectedSubject.name}</Badge>
+            <div className="flex items-center gap-2 mt-1.5">
+              <button onClick={() => { setSelectedLevel(null); setSelectedSubject(null); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                {selectedLevel.name}
+              </button>
+              <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
+              <button onClick={() => setSelectedSubject(null)} className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">
+                {selectedSubject.name}
+              </button>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={openCreateUnit}><FolderPlus className="h-4 w-4 mr-2" /> Add Unit</Button>
-          <Button onClick={openCreateLesson}><Plus className="h-4 w-4 mr-2" /> Add Lesson</Button>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="hidden sm:flex gap-1.5 py-1.5 px-3">
+            <BookMarked className="h-3.5 w-3.5" />
+            {totalLessons} lesson{totalLessons !== 1 ? 's' : ''}
+          </Badge>
+          <Button variant="outline" className="rounded-xl" onClick={openCreateUnit}>
+            <FolderPlus className="h-4 w-4 mr-2" /> Add Unit
+          </Button>
+          <Button className="rounded-xl" onClick={openCreateLesson}>
+            <Plus className="h-4 w-4 mr-2" /> Add Lesson
+          </Button>
         </div>
       </div>
 
@@ -371,22 +428,24 @@ export default function Lessons() {
 
       {/* Ungrouped lessons */}
       {ungroupedLessons.length > 0 && (
-        <Card>
+        <Card className="border-dashed border-border/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Ungrouped Lessons</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground font-medium">Ungrouped Lessons</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {ungroupedLessons.map(lesson => (
-              <div key={lesson.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow group">
-                <Badge variant="outline" className="shrink-0 text-xs font-mono">{lesson.order}</Badge>
+              <div key={lesson.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card hover:border-primary/30 hover:shadow-sm transition-all duration-200 group">
+                <div className="flex items-center justify-center h-7 w-7 rounded-md bg-muted text-muted-foreground text-xs font-bold shrink-0">
+                  {lesson.order}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-foreground truncate">{lesson.name}</p>
-                  {lesson.description && <p className="text-xs text-muted-foreground truncate">{lesson.description}</p>}
+                  {lesson.description && <p className="text-xs text-muted-foreground truncate mt-0.5">{lesson.description}</p>}
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/questions?lessonId=${lesson.id}`)}><BookOpen className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditLesson(lesson)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteLessonMut.mutate(lesson.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => navigate(`/questions?lessonId=${lesson.id}`)}><BookOpen className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEditLesson(lesson)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteLessonMut.mutate(lesson.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                 </div>
               </div>
             ))}
@@ -395,9 +454,21 @@ export default function Lessons() {
       )}
 
       {allUnits.length === 0 && ungroupedLessons.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No lessons yet. Start by creating a unit, then add lessons to it.</p>
+        <Card className="border-dashed">
+          <CardContent className="py-16 text-center">
+            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-muted mb-4">
+              <BookMarked className="h-7 w-7 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground mb-1">No lessons yet</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">Start by creating a unit to organize your lessons, then add lessons to it.</p>
+            <div className="flex justify-center gap-3 mt-6">
+              <Button variant="outline" className="rounded-xl" onClick={openCreateUnit}>
+                <FolderPlus className="h-4 w-4 mr-2" /> Create Unit
+              </Button>
+              <Button className="rounded-xl" onClick={openCreateLesson}>
+                <Plus className="h-4 w-4 mr-2" /> Add Lesson
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -409,9 +480,9 @@ export default function Lessons() {
             <DialogTitle>{editing ? 'Edit Lesson' : 'Add Lesson'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div><Label>Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Lesson name" /></div>
-            <div><Label>Description</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" /></div>
-            <div>
+            <div className="space-y-1.5"><Label>Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Lesson name" /></div>
+            <div className="space-y-1.5"><Label>Description</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" /></div>
+            <div className="space-y-1.5">
               <Label>Unit</Label>
               <div className="flex gap-2">
                 <Select value={form.unitId} onValueChange={v => setForm(f => ({ ...f, unitId: v }))}>
@@ -423,7 +494,7 @@ export default function Lessons() {
                 <Button variant="outline" size="icon" onClick={() => { setDialogOpen(false); openCreateUnit(); }}><FolderPlus className="h-4 w-4" /></Button>
               </div>
             </div>
-            <div><Label>Order</Label><Input type="number" min={1} value={form.order} onChange={e => setForm(f => ({ ...f, order: parseInt(e.target.value) || 1 }))} /></div>
+            <div className="space-y-1.5"><Label>Order</Label><Input type="number" min={1} value={form.order} onChange={e => setForm(f => ({ ...f, order: parseInt(e.target.value) || 1 }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -441,7 +512,7 @@ export default function Lessons() {
             <DialogTitle>{editingUnit ? 'Edit Unit' : 'Add Unit'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div><Label>Unit Name *</Label><Input value={unitForm.name} onChange={e => setUnitForm({ name: e.target.value })} placeholder="e.g. Unit 1: Basics" /></div>
+            <div className="space-y-1.5"><Label>Unit Name *</Label><Input value={unitForm.name} onChange={e => setUnitForm({ name: e.target.value })} placeholder="e.g. Unit 1: Basics" /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setUnitDialogOpen(false)}>Cancel</Button>
