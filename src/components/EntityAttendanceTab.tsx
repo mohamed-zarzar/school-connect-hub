@@ -136,26 +136,26 @@ export function EntityAttendanceTab({ entityType, entityId, entityName, recordTy
 
   return (
     <div className="space-y-4">
-      <div className="flex items-between justify-between flex-wrap gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{items.length} {recordType} for {entityName}</p>
-        <div className="flex  gap-2 flex-wrap ">
+        <div className="flex items-center gap-2 flex-wrap">
           {viewMode !== 'calendar' && (
             <>
-              <div className="h-full flex flex-col justify-end ">
+              <div className="flex flex-col">
                 <Label className="text-xs">From</Label>
-                <DatePickerField value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-36 h-8" />
+                <DatePickerField value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-32 h-8" />
               </div>
-              <div className="h-full flex flex-col justify-end">
+              <div className="flex flex-col">
                 <Label className="text-xs">To</Label>
-                <DatePickerField value={dateTo} onChange={setDateTo} placeholder="To date" className="w-36 h-8" />
+                <DatePickerField value={dateTo} onChange={setDateTo} placeholder="To date" className="w-32 h-8" />
               </div>
               {(dateFrom || dateTo) && (
-                <Button variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); }} className="mt-4">Clear</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); }} className="self-end">Clear</Button>
               )}
             </>
           )}
-          <div className="mt-4 flex flex-col justify-end"><ViewToggle view={viewMode} onViewChange={setViewMode} /></div>
-          <Button size="sm" className="mt-4" onClick={() => { resetForm(); setEditingId(null); setDialogOpen(true); }}>
+          <div className="self-end"><ViewToggle view={viewMode} onViewChange={setViewMode} /></div>
+          <Button size="sm" className="self-end" onClick={() => { resetForm(); setEditingId(null); setDialogOpen(true); }}>
             <Plus className="mr-2 h-4 w-4" />Add {isAbsences ? 'Absence' : 'Late'}
           </Button>
         </div>
