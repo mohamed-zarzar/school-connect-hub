@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { lessonApi, unitApi } from '@/services/exam-api';
 import { levelApi, subjectApi } from '@/services/api';
@@ -10,18 +10,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, BookOpen, GripVertical, ArrowLeft, FolderPlus, ChevronRight, Layers, BookMarked } from 'lucide-react';
+import { Plus, Pencil, Trash2, BookOpen, GripVertical, ArrowLeft, FolderPlus, ChevronRight, Download, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { InlineEdit } from '@/components/InlineEdit';
+import { ExcelImportDialog } from '@/components/ExcelImportDialog';
+import { exportToExcel } from '@/lib/excel-utils';
 import type { Lesson, Unit } from '@/types/exam';
 import type { Level, Subject } from '@/types';
 import {
   DndContext,
-  closestCenter,
+  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
+  DragOverlay,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -30,93 +37,153 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+// ── Inline Order Edit ──
+function InlineOrderEdit({ value, onSave }: { value: number; onSave: (v: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(String(value));
+
+  useEffect(() => { setVal(String(value)); }, [value]);
+
+  if (!editing) {
+    return (
+      <Badge
+        variant="outline"
+        className="shrink-0 text-xs font-mono cursor-pointer hover:bg-primary/10 transition-colors"
+        onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      >
+        {value}
+      </Badge>
+    );
+  }
+
+  return (
+    <Input
+      type="number"
+      min={1}
+      value={val}
+      onChange={e => setVal(e.target.value)}
+      onBlur={() => {
+        const n = parseInt(val);
+        if (n && n !== value) onSave(n);
+        setEditing(false);
+      }}
+      onKeyDown={e => {
+        if (e.key === 'Enter') {
+          const n = parseInt(val);
+          if (n && n !== value) onSave(n);
+          setEditing(false);
+        }
+        if (e.key === 'Escape') setEditing(false);
+      }}
+      className="w-14 h-6 text-xs text-center p-1"
+      autoFocus
+      onClick={e => e.stopPropagation()}
+    />
+  );
+}
+
 // ── Sortable Lesson Item ──
-function SortableLessonItem({ lesson, onEdit, onDelete, onViewQuestions }: {
+function SortableLessonItem({ lesson, onUpdate, onDelete, onViewQuestions }: {
   lesson: Lesson;
-  onEdit: (l: Lesson) => void;
+  onUpdate: (id: string, data: Partial<Lesson>) => void;
   onDelete: (id: string) => void;
   onViewQuestions: (id: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card hover:border-primary/30 hover:shadow-sm transition-all duration-200 group">
-      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+    <div ref={setNodeRef} style={style} className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow group">
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
         <GripVertical className="h-4 w-4" />
       </button>
-      <div className="flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-primary text-xs font-bold shrink-0">
-        {lesson.order}
-      </div>
+      <InlineOrderEdit value={lesson.order} onSave={(v) => onUpdate(lesson.id, { order: v })} />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-foreground truncate">{lesson.name}</p>
-        {lesson.description && <p className="text-xs text-muted-foreground truncate mt-0.5">{lesson.description}</p>}
+        <InlineEdit value={lesson.name} onSave={(val) => onUpdate(lesson.id, { name: val })} className="font-medium text-sm text-foreground block truncate" />
+        <InlineEdit value={lesson.description || ''} onSave={(val) => onUpdate(lesson.id, { description: val })} className="text-xs text-muted-foreground block truncate" placeholder="Add description..." />
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => onViewQuestions(lesson.id)}><BookOpen className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => onEdit(lesson)}><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => onDelete(lesson.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onViewQuestions(lesson.id)}><BookOpen className="h-3.5 w-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(lesson.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
       </div>
     </div>
   );
 }
 
-// ── Sortable Unit Group ──
-function SortableUnitGroup({ unit, lessons, onEditLesson, onDeleteLesson, onViewQuestions, onReorderLessons, onEditUnit, onDeleteUnit }: {
+// ── Lesson Overlay (for DragOverlay) ──
+function LessonOverlay({ lesson }: { lesson: Lesson }) {
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card shadow-lg opacity-90">
+      <GripVertical className="h-4 w-4 text-muted-foreground" />
+      <Badge variant="outline" className="shrink-0 text-xs font-mono">{lesson.order}</Badge>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-foreground truncate">{lesson.name}</p>
+        {lesson.description && <p className="text-xs text-muted-foreground truncate">{lesson.description}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── Sortable Unit Container ──
+function SortableUnitDropZone({ unit, isOver, children, onUpdateUnit, onDeleteUnit }: {
   unit: Unit;
-  lessons: Lesson[];
-  onEditLesson: (l: Lesson) => void;
-  onDeleteLesson: (id: string) => void;
-  onViewQuestions: (id: string) => void;
-  onReorderLessons: (unitId: string, lessonIds: string[]) => void;
-  onEditUnit: (u: Unit) => void;
+  isOver: boolean;
+  children: React.ReactNode;
+  onUpdateUnit: (id: string, data: Partial<Unit>) => void;
   onDeleteUnit: (id: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: unit.id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  const handleLessonDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const ids = lessons.map(l => l.id);
-    const oldIdx = ids.indexOf(active.id as string);
-    const newIdx = ids.indexOf(over.id as string);
-    const newIds = [...ids];
-    newIds.splice(oldIdx, 1);
-    newIds.splice(newIdx, 0, active.id as string);
-    onReorderLessons(unit.id, newIds);
-  };
+  const { setNodeRef: setDropRef } = useDroppable({ id: unit.id });
 
   return (
-    <div ref={setNodeRef} style={style} className="rounded-xl border border-border/60 bg-card overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
-      <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 border-b border-border/60">
-        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors">
+    <div className={`rounded-xl border bg-card overflow-hidden transition-all ${isOver ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
+      <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 border-b">
+        <InlineOrderEdit value={unit.order} onSave={(v) => onUpdateUnit(unit.id, { order: v })} />
+        <div className="flex-1">
+          <InlineEdit value={unit.name} onSave={(val) => onUpdateUnit(unit.id, { name: val })} className="font-semibold text-sm text-foreground" />
+        </div>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDeleteUnit(unit.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+      </div>
+      <div ref={setDropRef} className="p-3 space-y-2 min-h-[48px]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Draggable Unit Wrapper ──
+function DraggableUnit({ unit, children, onUpdateUnit, onDeleteUnit }: {
+  unit: Unit;
+  children: React.ReactNode;
+  onUpdateUnit: (id: string, data: Partial<Unit>) => void;
+  onDeleteUnit: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `unit-drag-${unit.id}` });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div className="flex items-center gap-1">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-1">
           <GripVertical className="h-4 w-4" />
         </button>
-        <div className="flex items-center justify-center h-7 w-7 rounded-lg bg-primary/15 text-primary">
-          <Layers className="h-3.5 w-3.5" />
+        <div className="flex-1">
+          <SortableUnitDropZone unit={unit} isOver={false} onUpdateUnit={onUpdateUnit} onDeleteUnit={onDeleteUnit}>
+            {children}
+          </SortableUnitDropZone>
         </div>
-        <h3 className="font-semibold text-sm text-foreground flex-1">{unit.name}</h3>
-        <Badge variant="secondary" className="text-xs font-normal">{lessons.length} lesson{lessons.length !== 1 ? 's' : ''}</Badge>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => onEditUnit(unit)}><Pencil className="h-3.5 w-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => onDeleteUnit(unit.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
       </div>
-      <div className="p-3 space-y-2">
-        {lessons.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-            <BookMarked className="h-8 w-8 mb-2 opacity-30" />
-            <p className="text-sm">No lessons in this unit yet</p>
-          </div>
-        ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd}>
-            <SortableContext items={lessons.map(l => l.id)} strategy={verticalListSortingStrategy}>
-              {lessons.map(lesson => (
-                <SortableLessonItem key={lesson.id} lesson={lesson} onEdit={onEditLesson} onDelete={onDeleteLesson} onViewQuestions={onViewQuestions} />
-              ))}
-            </SortableContext>
-          </DndContext>
-        )}
+    </div>
+  );
+}
+
+// ── Unit Overlay ──
+function UnitOverlay({ unit }: { unit: Unit }) {
+  return (
+    <div className="rounded-xl border bg-card shadow-lg opacity-90 p-4">
+      <div className="flex items-center gap-2">
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <Badge className="bg-primary/10 text-primary border-0">{unit.order}</Badge>
+        <span className="font-semibold text-sm">{unit.name}</span>
       </div>
     </div>
   );
@@ -124,39 +191,24 @@ function SortableUnitGroup({ unit, lessons, onEditLesson, onDeleteLesson, onView
 
 // ── Level Selection Step ──
 function LevelSelector({ levels, onSelect }: { levels: Level[]; onSelect: (l: Level) => void }) {
-  const styles = [
-    { bg: 'bg-primary/5', border: 'border-primary/20', hover: 'hover:border-primary/40 hover:bg-primary/10', icon: '🎓', accent: 'text-primary' },
-    { bg: 'bg-accent/30', border: 'border-accent/40', hover: 'hover:border-accent/60 hover:bg-accent/50', icon: '📚', accent: 'text-accent-foreground' },
-    { bg: 'bg-destructive/5', border: 'border-destructive/20', hover: 'hover:border-destructive/40 hover:bg-destructive/10', icon: '🏆', accent: 'text-destructive' },
-    { bg: 'bg-secondary', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-secondary/80', icon: '⭐', accent: 'text-foreground' },
-    { bg: 'bg-muted/50', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-muted', icon: '🌟', accent: 'text-foreground' },
-  ];
-
+  const colors = ['bg-emerald-500/10 text-emerald-700 border-emerald-200', 'bg-blue-500/10 text-blue-700 border-blue-200', 'bg-red-500/10 text-red-700 border-red-200', 'bg-amber-500/10 text-amber-700 border-amber-200', 'bg-purple-500/10 text-purple-700 border-purple-200'];
+  const emojis = ['🟢', '🔵', '🔴', '🟡', '🟣'];
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary/10 mb-2">
-          <Layers className="h-7 w-7 text-primary" />
-        </div>
-        <h2 className="text-2xl font-bold text-foreground">Select a Level</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">Choose the education level to manage its curriculum and lessons</p>
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-xl font-bold text-foreground">Select a Level</h2>
+        <p className="text-sm text-muted-foreground mt-1">Choose a level to manage its lessons</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-4xl mx-auto">
-        {levels.map((level, i) => {
-          const s = styles[i % styles.length];
-          return (
-            <button key={level.id} onClick={() => onSelect(level)}
-              className={`group relative p-6 rounded-2xl border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 text-left ${s.bg} ${s.border} ${s.hover}`}>
-              <span className="text-4xl block">{s.icon}</span>
-              <h3 className={`text-lg font-bold mt-4 ${s.accent}`}>{level.name}</h3>
-              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{level.description || 'Click to explore lessons'}</p>
-              <div className="flex items-center gap-1.5 mt-4 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                <span>Explore</span>
-                <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform duration-200" />
-              </div>
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {levels.map((level, i) => (
+          <button key={level.id} onClick={() => onSelect(level)}
+            className={`group p-6 rounded-xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] text-left ${colors[i % colors.length]}`}>
+            <span className="text-3xl">{emojis[i % emojis.length]}</span>
+            <h3 className="text-lg font-bold mt-3">{level.name}</h3>
+            <p className="text-xs mt-1 opacity-70">{level.description || 'Click to select'}</p>
+            <ChevronRight className="h-5 w-5 mt-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -164,47 +216,27 @@ function LevelSelector({ levels, onSelect }: { levels: Level[]; onSelect: (l: Le
 
 // ── Subject Selection Step ──
 function SubjectSelector({ subjects, levelName, onSelect, onBack }: { subjects: Subject[]; levelName: string; onSelect: (s: Subject) => void; onBack: () => void }) {
-  const styles = [
-    { icon: '📘', bg: 'bg-primary/5', border: 'border-primary/20', hover: 'hover:border-primary/40 hover:bg-primary/10' },
-    { icon: '🧪', bg: 'bg-accent/30', border: 'border-accent/40', hover: 'hover:border-accent/60 hover:bg-accent/50' },
-    { icon: '🌍', bg: 'bg-secondary', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-secondary/80' },
-    { icon: '📐', bg: 'bg-destructive/5', border: 'border-destructive/20', hover: 'hover:border-destructive/40 hover:bg-destructive/10' },
-    { icon: '🎨', bg: 'bg-muted/50', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-muted' },
-    { icon: '🎵', bg: 'bg-primary/5', border: 'border-primary/20', hover: 'hover:border-primary/40 hover:bg-primary/10' },
-    { icon: '💻', bg: 'bg-accent/30', border: 'border-accent/40', hover: 'hover:border-accent/60 hover:bg-accent/50' },
-    { icon: '📖', bg: 'bg-secondary', border: 'border-border', hover: 'hover:border-primary/30 hover:bg-secondary/80' },
-  ];
-
+  const emojis = ['📘', '🧪', '🌍', '📐', '🎨', '🎵', '💻', '📖'];
+  const colors = ['bg-blue-500/10 text-blue-700 border-blue-200', 'bg-green-500/10 text-green-700 border-green-200', 'bg-teal-500/10 text-teal-700 border-teal-200', 'bg-orange-500/10 text-orange-700 border-orange-200', 'bg-pink-500/10 text-pink-700 border-pink-200', 'bg-violet-500/10 text-violet-700 border-violet-200'];
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Select a Subject</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm text-muted-foreground">Level:</span>
-            <Badge variant="secondary" className="font-medium">{levelName}</Badge>
-          </div>
+          <h2 className="text-xl font-bold text-foreground">Select a Subject</h2>
+          <p className="text-sm text-muted-foreground">Level: <Badge variant="outline">{levelName}</Badge></p>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {subjects.map((subject, i) => {
-          const s = styles[i % styles.length];
-          return (
-            <button key={subject.id} onClick={() => onSelect(subject)}
-              className={`group relative p-6 rounded-2xl border-2 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 text-left ${s.bg} ${s.border} ${s.hover}`}>
-              <span className="text-4xl block">{s.icon}</span>
-              <h3 className="text-lg font-bold mt-4 text-foreground">{subject.name}</h3>
-              <p className="text-xs text-muted-foreground mt-1.5">{subject.code}</p>
-              <div className="flex items-center gap-1.5 mt-4 text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                <span>View lessons</span>
-                <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform duration-200" />
-              </div>
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {subjects.map((subject, i) => (
+          <button key={subject.id} onClick={() => onSelect(subject)}
+            className={`group p-6 rounded-xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] text-left ${colors[i % colors.length]}`}>
+            <span className="text-3xl">{emojis[i % emojis.length]}</span>
+            <h3 className="text-lg font-bold mt-3">{subject.name}</h3>
+            <p className="text-xs mt-1 opacity-70">{subject.code}</p>
+            <ChevronRight className="h-5 w-5 mt-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -221,9 +253,18 @@ export default function Lessons() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [unitDialogOpen, setUnitDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Lesson | null>(null);
-  const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [form, setForm] = useState({ name: '', description: '', unitId: '', order: 1 });
-  const [unitForm, setUnitForm] = useState({ name: '' });
+  const [unitForm, setUnitForm] = useState({ name: '', order: 1 });
+  const [pendingLessonForm, setPendingLessonForm] = useState<typeof form | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // DnD state
+  const [containers, setContainers] = useState<Record<string, string[]>>({});
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragType, setDragType] = useState<'lesson' | 'unit' | null>(null);
+  // For tracking cross‑unit moves
+  const [originalContainer, setOriginalContainer] = useState<string | null>(null);
+  const [initialContainerItems, setInitialContainerItems] = useState<Record<string, string[]>>({});
 
   const { data: levelsRes } = useQuery({ queryKey: ['levels-all'], queryFn: () => levelApi.getAll({ page: 1, limit: 100 }) });
   const { data: subjectsRes } = useQuery({ queryKey: ['subjects-all'], queryFn: () => subjectApi.getAll({ page: 1, limit: 100 }) });
@@ -234,30 +275,157 @@ export default function Lessons() {
     queryKey: ['lessons', selectedLevel?.id, selectedSubject?.id],
     queryFn: () => lessonApi.getBySubjectAndLevel(selectedSubject!.id, selectedLevel!.id),
     enabled: !!selectedLevel && !!selectedSubject,
+    refetchOnMount: 'always',
   });
 
   const { data: unitsRes } = useQuery({
     queryKey: ['units', selectedLevel?.id, selectedSubject?.id],
     queryFn: () => unitApi.getAll({ subjectId: selectedSubject!.id, levelId: selectedLevel!.id }),
     enabled: !!selectedLevel && !!selectedSubject,
+    refetchOnMount: 'always',
   });
 
   const allLessons = lessonsRes?.data ?? [];
   const allUnits = (unitsRes?.data ?? []).sort((a, b) => a.order - b.order);
 
-  const groupedLessons = useMemo(() => {
-    const groups: Record<string, Lesson[]> = {};
-    allUnits.forEach(u => { groups[u.id] = []; });
-    groups['__ungrouped__'] = [];
+  // Sync containers from server data
+  useEffect(() => {
+    const c: Record<string, string[]> = {};
+    allUnits.forEach(u => { c[u.id] = []; });
+    c['__ungrouped__'] = [];
     allLessons.forEach(l => {
-      const key = l.unitId && groups[l.unitId] !== undefined ? l.unitId : '__ungrouped__';
-      groups[key].push(l);
+      const key = l.unitId && c[l.unitId] !== undefined ? l.unitId : '__ungrouped__';
+      c[key].push(l.id);
     });
-    Object.values(groups).forEach(arr => arr.sort((a, b) => a.order - b.order));
-    return groups;
+    Object.values(c).forEach(arr => arr.sort((a, b) => {
+      const la = allLessons.find(l => l.id === a);
+      const lb = allLessons.find(l => l.id === b);
+      return (la?.order ?? 0) - (lb?.order ?? 0);
+    }));
+    setContainers(c);
   }, [allLessons, allUnits]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const activeLesson = useMemo(() => activeId ? allLessons.find(l => l.id === activeId) : null, [activeId, allLessons]);
+  const activeUnit = useMemo(() => {
+    if (!activeId || !activeId.startsWith('unit-drag-')) return null;
+    const unitId = activeId.replace('unit-drag-', '');
+    return allUnits.find(u => u.id === unitId);
+  }, [activeId, allUnits]);
+
+  // ── DnD helpers ──
+  const findContainer = useCallback((id: string): string | undefined => {
+    if (containers[id] !== undefined) return id;
+    for (const [containerId, lessonIds] of Object.entries(containers)) {
+      if (lessonIds.includes(id)) return containerId;
+    }
+    return undefined;
+  }, [containers]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = event.active.id as string;
+    setActiveId(id);
+    setDragType(id.startsWith('unit-drag-') ? 'unit' : 'lesson');
+
+    if (!id.startsWith('unit-drag-')) {
+      const container = findContainer(id);
+      if (container) {
+        setOriginalContainer(container);
+        setInitialContainerItems(prev => ({
+          ...prev,
+          [container]: [...(containers[container] || [])]
+        }));
+      }
+    }
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over || dragType === 'unit') return;
+
+    const activeContainer = findContainer(active.id as string);
+    const overContainer = findContainer(over.id as string);
+
+    if (!activeContainer || !overContainer || activeContainer === overContainer) return;
+
+    setContainers(prev => {
+      const activeItems = [...(prev[activeContainer] || [])];
+      const overItems = [...(prev[overContainer] || [])];
+      const activeIndex = activeItems.indexOf(active.id as string);
+      if (activeIndex === -1) return prev;
+
+      const overIndex = over.id === overContainer ? overItems.length : overItems.indexOf(over.id as string);
+      activeItems.splice(activeIndex, 1);
+      overItems.splice(Math.max(0, overIndex), 0, active.id as string);
+      return { ...prev, [activeContainer]: activeItems, [overContainer]: overItems };
+    });
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setDragType(null);
+    if (!over) {
+      // Clean up state even if no target
+      setOriginalContainer(null);
+      setInitialContainerItems({});
+      return;
+    }
+
+    // Unit reordering
+    if ((active.id as string).startsWith('unit-drag-')) {
+      const activeUnitId = (active.id as string).replace('unit-drag-', '');
+      const overUnitId = (over.id as string).replace('unit-drag-', '');
+      if (activeUnitId !== overUnitId) {
+        const unitIds = allUnits.map(u => u.id);
+        const oldIdx = unitIds.indexOf(activeUnitId);
+        const newIdx = unitIds.indexOf(overUnitId);
+        if (oldIdx !== -1 && newIdx !== -1) {
+          const newOrder = [...unitIds];
+          newOrder.splice(oldIdx, 1);
+          newOrder.splice(newIdx, 0, activeUnitId);
+          reorderUnitsMut.mutate(newOrder);
+        }
+      }
+      setOriginalContainer(null);
+      setInitialContainerItems({});
+      return;
+    }
+
+    // Lesson reordering
+    const lesson = allLessons.find(l => l.id === active.id);
+    if (!lesson) {
+      setOriginalContainer(null);
+      setInitialContainerItems({});
+      return;
+    }
+
+    const overContainer = findContainer(over.id as string);
+    if (!overContainer) {
+      setOriginalContainer(null);
+      setInitialContainerItems({});
+      return;
+    }
+
+    // Cross‑unit move?
+    if (originalContainer && originalContainer !== overContainer) {
+      const targetOrder = containers[overContainer] || [];
+      const newUnitId = overContainer === '__ungrouped__' ? '' : overContainer;
+      moveToUnitMut.mutate({ lessonId: lesson.id, newUnitId, targetOrder });
+    } else {
+      // Within‑unit reorder – only call if order actually changed
+      const items = containers[overContainer] || [];
+      const initialItems = initialContainerItems[overContainer] || [];
+      if (JSON.stringify(items) !== JSON.stringify(initialItems)) {
+        reorderWithinUnitMut.mutate(items);
+      }
+    }
+
+    // Clean up temporary drag state
+    setOriginalContainer(null);
+    setInitialContainerItems({});
+  };
 
   // ── Mutations ──
   const invalidate = () => {
@@ -271,23 +439,37 @@ export default function Lessons() {
   });
   const updateLessonMut = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Lesson> }) => lessonApi.update(id, data),
-    onSuccess: () => { invalidate(); toast({ title: 'Lesson updated' }); setDialogOpen(false); },
+    onSuccess: () => { invalidate(); toast({ title: 'Lesson updated' }); },
   });
   const deleteLessonMut = useMutation({
     mutationFn: (id: string) => lessonApi.delete(id),
     onSuccess: () => { invalidate(); toast({ title: 'Lesson deleted' }); },
   });
-  const reorderLessonsMut = useMutation({
+  const reorderWithinUnitMut = useMutation({
     mutationFn: (ids: string[]) => lessonApi.reorder(ids),
     onSuccess: () => invalidate(),
   });
+  const moveToUnitMut = useMutation({
+    mutationFn: ({ lessonId, newUnitId, targetOrder }: { lessonId: string; newUnitId: string; targetOrder: string[] }) =>
+      lessonApi.moveToUnit(lessonId, newUnitId, targetOrder),
+    onSuccess: () => { invalidate(); toast({ title: 'Lesson moved' }); },
+  });
   const createUnitMut = useMutation({
     mutationFn: (data: Omit<Unit, 'id' | 'createdAt'>) => unitApi.create(data),
-    onSuccess: () => { invalidate(); toast({ title: 'Unit created' }); setUnitDialogOpen(false); },
+    onSuccess: (res) => {
+      invalidate();
+      toast({ title: 'Unit created' });
+      setUnitDialogOpen(false);
+      if (pendingLessonForm) {
+        setForm({ ...pendingLessonForm, unitId: res.data.id });
+        setDialogOpen(true);
+        setPendingLessonForm(null);
+      }
+    },
   });
   const updateUnitMut = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<Unit> }) => unitApi.update(id, data),
-    onSuccess: () => { invalidate(); toast({ title: 'Unit updated' }); setUnitDialogOpen(false); },
+    onSuccess: () => { invalidate(); toast({ title: 'Unit updated' }); },
   });
   const deleteUnitMut = useMutation({
     mutationFn: (id: string) => unitApi.delete(id),
@@ -295,7 +477,7 @@ export default function Lessons() {
   });
   const reorderUnitsMut = useMutation({
     mutationFn: (ids: string[]) => unitApi.reorder(ids),
-    onSuccess: () => invalidate(),
+    onSuccess: () => { invalidate(); toast({ title: 'Units reordered' }); },
   });
 
   // ── Handlers ──
@@ -305,11 +487,6 @@ export default function Lessons() {
     setForm({ name: '', description: '', unitId: allUnits[0]?.id ?? '', order: maxOrder + 1 });
     setDialogOpen(true);
   };
-  const openEditLesson = (l: Lesson) => {
-    setEditing(l);
-    setForm({ name: l.name, description: l.description, unitId: l.unitId, order: l.order });
-    setDialogOpen(true);
-  };
   const handleSubmitLesson = () => {
     if (!form.name) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
     const data = { name: form.name, description: form.description, subjectId: selectedSubject!.id, levelId: selectedLevel!.id, unitId: form.unitId, order: form.order };
@@ -317,28 +494,17 @@ export default function Lessons() {
     else createLessonMut.mutate(data);
   };
 
-  const openCreateUnit = () => { setEditingUnit(null); setUnitForm({ name: '' }); setUnitDialogOpen(true); };
-  const openEditUnit = (u: Unit) => { setEditingUnit(u); setUnitForm({ name: u.name }); setUnitDialogOpen(true); };
+  const openCreateUnit = () => { setUnitForm({ name: '', order: allUnits.length + 1 }); setUnitDialogOpen(true); };
   const handleSubmitUnit = () => {
     if (!unitForm.name) { toast({ title: 'Name is required', variant: 'destructive' }); return; }
-    if (editingUnit) updateUnitMut.mutate({ id: editingUnit.id, data: { name: unitForm.name } });
-    else createUnitMut.mutate({ name: unitForm.name, subjectId: selectedSubject!.id, levelId: selectedLevel!.id, order: allUnits.length + 1 });
+    createUnitMut.mutate({ name: unitForm.name, subjectId: selectedSubject!.id, levelId: selectedLevel!.id, order: unitForm.order });
   };
 
-  const handleReorderLessons = (unitId: string, lessonIds: string[]) => {
-    reorderLessonsMut.mutate(lessonIds);
+  const handleInlineUpdateLesson = (id: string, data: Partial<Lesson>) => {
+    updateLessonMut.mutate({ id, data });
   };
-
-  const handleUnitDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const ids = allUnits.map(u => u.id);
-    const oldIdx = ids.indexOf(active.id as string);
-    const newIdx = ids.indexOf(over.id as string);
-    const newIds = [...ids];
-    newIds.splice(oldIdx, 1);
-    newIds.splice(newIdx, 0, active.id as string);
-    reorderUnitsMut.mutate(newIds);
+  const handleInlineUpdateUnit = (id: string, data: Partial<Unit>) => {
+    updateUnitMut.mutate({ id, data });
   };
 
   // ── Step rendering ──
@@ -355,120 +521,123 @@ export default function Lessons() {
   }
 
   if (!selectedSubject) {
+    // Filter subjects by level's subjectIds
+    const levelSubjects = selectedLevel.subjectIds?.length > 0
+      ? subjects.filter(s => selectedLevel.subjectIds.includes(s.id))
+      : subjects;
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Lessons</h1>
           <p className="text-sm text-muted-foreground">Manage lessons by level and subject</p>
         </div>
-        <SubjectSelector subjects={subjects} levelName={selectedLevel.name} onSelect={setSelectedSubject} onBack={() => setSelectedLevel(null)} />
+        <SubjectSelector subjects={levelSubjects} levelName={selectedLevel.name} onSelect={setSelectedSubject} onBack={() => setSelectedLevel(null)} />
       </div>
     );
   }
 
   // ── Full lessons view ──
-  const ungroupedLessons = groupedLessons['__ungrouped__'] ?? [];
-  const totalLessons = allLessons.length;
+  const ungroupedLessons = (containers['__ungrouped__'] ?? []).map(id => allLessons.find(l => l.id === id)).filter(Boolean) as Lesson[];
+  const unitDragIds = allUnits.map(u => `unit-drag-${u.id}`);
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" className="rounded-xl h-10 w-10 shrink-0" onClick={() => setSelectedSubject(null)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setSelectedSubject(null)}><ArrowLeft className="h-4 w-4" /></Button>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Lessons</h1>
-            <div className="flex items-center gap-2 mt-1.5">
-              <button onClick={() => { setSelectedLevel(null); setSelectedSubject(null); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                {selectedLevel.name}
-              </button>
-              <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-              <button onClick={() => setSelectedSubject(null)} className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">
-                {selectedSubject.name}
-              </button>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="outline" className="cursor-pointer" onClick={() => { setSelectedLevel(null); setSelectedSubject(null); }}>{selectedLevel.name}</Badge>
+              <ChevronRight className="h-3 w-3 text-muted-foreground" />
+              <Badge variant="secondary" className="cursor-pointer" onClick={() => setSelectedSubject(null)}>{selectedSubject.name}</Badge>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary" className="hidden sm:flex gap-1.5 py-1.5 px-3">
-            <BookMarked className="h-3.5 w-3.5" />
-            {totalLessons} lesson{totalLessons !== 1 ? 's' : ''}
-          </Badge>
-          <Button variant="outline" className="rounded-xl" onClick={openCreateUnit}>
-            <FolderPlus className="h-4 w-4 mr-2" /> Add Unit
-          </Button>
-          <Button className="rounded-xl" onClick={openCreateLesson}>
-            <Plus className="h-4 w-4 mr-2" /> Add Lesson
-          </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => {
+            const cols = [
+              { key: 'name' as const, label: 'Name' },
+              { key: 'description' as const, label: 'Description' },
+              { key: 'unitId' as const, label: 'Unit', render: (l: Lesson) => allUnits.find(u => u.id === l.unitId)?.name ?? '' },
+              { key: 'order' as const, label: 'Order' },
+            ];
+            exportToExcel(allLessons, cols, `lessons-${selectedLevel.name}-${selectedSubject.name}`);
+          }}><Download className="h-4 w-4 mr-2" />Export</Button>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-2" />Import</Button>
+          <Button variant="outline" onClick={openCreateUnit}><FolderPlus className="h-4 w-4 mr-2" /> Add Unit</Button>
+          <Button onClick={openCreateLesson}><Plus className="h-4 w-4 mr-2" /> Add Lesson</Button>
         </div>
       </div>
 
-      {/* Units with drag-and-drop */}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleUnitDragEnd}>
-        <SortableContext items={allUnits.map(u => u.id)} strategy={verticalListSortingStrategy}>
+      {/* Units + Lessons with DnD */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext items={unitDragIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-4">
-            {allUnits.map(unit => (
-              <SortableUnitGroup
-                key={unit.id}
-                unit={unit}
-                lessons={groupedLessons[unit.id] ?? []}
-                onEditLesson={openEditLesson}
-                onDeleteLesson={id => deleteLessonMut.mutate(id)}
-                onViewQuestions={id => navigate(`/questions?lessonId=${id}`)}
-                onReorderLessons={handleReorderLessons}
-                onEditUnit={openEditUnit}
-                onDeleteUnit={id => deleteUnitMut.mutate(id)}
-              />
-            ))}
+            {allUnits.map(unit => {
+              const unitLessons = (containers[unit.id] ?? []).map(id => allLessons.find(l => l.id === id)).filter(Boolean) as Lesson[];
+              return (
+                <DraggableUnit key={unit.id} unit={unit} onUpdateUnit={handleInlineUpdateUnit} onDeleteUnit={id => deleteUnitMut.mutate(id)}>
+                  <SortableContext items={containers[unit.id] ?? []} strategy={verticalListSortingStrategy}>
+                    {unitLessons.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Drop lessons here or add new ones</p>
+                    ) : (
+                      unitLessons.map(lesson => (
+                        <SortableLessonItem
+                          key={lesson.id}
+                          lesson={lesson}
+                          onUpdate={handleInlineUpdateLesson}
+                          onDelete={id => deleteLessonMut.mutate(id)}
+                          onViewQuestions={id => navigate(`/questions?lessonId=${id}`)}
+                        />
+                      ))
+                    )}
+                  </SortableContext>
+                </DraggableUnit>
+              );
+            })}
           </div>
         </SortableContext>
+
+        {/* Ungrouped lessons */}
+        {ungroupedLessons.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Ungrouped Lessons</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <SortableContext items={containers['__ungrouped__'] ?? []} strategy={verticalListSortingStrategy}>
+                {ungroupedLessons.map(lesson => (
+                  <SortableLessonItem
+                    key={lesson.id}
+                    lesson={lesson}
+                    onUpdate={handleInlineUpdateLesson}
+                    onDelete={id => deleteLessonMut.mutate(id)}
+                    onViewQuestions={id => navigate(`/questions?lessonId=${id}`)}
+                  />
+                ))}
+              </SortableContext>
+            </CardContent>
+          </Card>
+        )}
+
+        <DragOverlay>
+          {activeLesson && <LessonOverlay lesson={activeLesson} />}
+          {activeUnit && <UnitOverlay unit={activeUnit} />}
+        </DragOverlay>
       </DndContext>
 
-      {/* Ungrouped lessons */}
-      {ungroupedLessons.length > 0 && (
-        <Card className="border-dashed border-border/60">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground font-medium">Ungrouped Lessons</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {ungroupedLessons.map(lesson => (
-              <div key={lesson.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/60 bg-card hover:border-primary/30 hover:shadow-sm transition-all duration-200 group">
-                <div className="flex items-center justify-center h-7 w-7 rounded-md bg-muted text-muted-foreground text-xs font-bold shrink-0">
-                  {lesson.order}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-foreground truncate">{lesson.name}</p>
-                  {lesson.description && <p className="text-xs text-muted-foreground truncate mt-0.5">{lesson.description}</p>}
-                </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => navigate(`/questions?lessonId=${lesson.id}`)}><BookOpen className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => openEditLesson(lesson)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteLessonMut.mutate(lesson.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
       {allUnits.length === 0 && ungroupedLessons.length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-16 text-center">
-            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-muted mb-4">
-              <BookMarked className="h-7 w-7 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">No lessons yet</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">Start by creating a unit to organize your lessons, then add lessons to it.</p>
-            <div className="flex justify-center gap-3 mt-6">
-              <Button variant="outline" className="rounded-xl" onClick={openCreateUnit}>
-                <FolderPlus className="h-4 w-4 mr-2" /> Create Unit
-              </Button>
-              <Button className="rounded-xl" onClick={openCreateLesson}>
-                <Plus className="h-4 w-4 mr-2" /> Add Lesson
-              </Button>
-            </div>
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">No lessons yet. Start by creating a unit, then add lessons to it.</p>
           </CardContent>
         </Card>
       )}
@@ -480,9 +649,9 @@ export default function Lessons() {
             <DialogTitle>{editing ? 'Edit Lesson' : 'Add Lesson'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1.5"><Label>Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Lesson name" /></div>
-            <div className="space-y-1.5"><Label>Description</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" /></div>
-            <div className="space-y-1.5">
+            <div><Label>Name *</Label><Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Lesson name" /></div>
+            <div><Label>Description</Label><Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description" /></div>
+            <div>
               <Label>Unit</Label>
               <div className="flex gap-2">
                 <Select value={form.unitId} onValueChange={v => setForm(f => ({ ...f, unitId: v }))}>
@@ -491,10 +660,14 @@ export default function Lessons() {
                     {allUnits.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" onClick={() => { setDialogOpen(false); openCreateUnit(); }}><FolderPlus className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={() => {
+                  setPendingLessonForm({ ...form });
+                  setDialogOpen(false);
+                  openCreateUnit();
+                }}><FolderPlus className="h-4 w-4" /></Button>
               </div>
             </div>
-            <div className="space-y-1.5"><Label>Order</Label><Input type="number" min={1} value={form.order} onChange={e => setForm(f => ({ ...f, order: parseInt(e.target.value) || 1 }))} /></div>
+            <div><Label>Order</Label><Input type="number" min={1} value={form.order} onChange={e => setForm(f => ({ ...f, order: parseInt(e.target.value) || 1 }))} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
@@ -505,20 +678,60 @@ export default function Lessons() {
         </DialogContent>
       </Dialog>
 
+      {/* Excel Import Dialog */}
+      <ExcelImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        expectedColumns={['Name', 'Description', 'Unit', 'Order']}
+        onImport={(rows) => {
+          let count = 0;
+          rows.forEach(row => {
+            const name = row['Name'] || row['name'];
+            if (!name) return;
+            const unitName = row['Unit'] || row['unit'] || '';
+            const matchedUnit = allUnits.find(u => u.name.toLowerCase() === unitName.toLowerCase());
+            const order = parseInt(row['Order'] || row['order'] || '0') || (allLessons.length + count + 1);
+            createLessonMut.mutate({
+              name,
+              description: row['Description'] || row['description'] || '',
+              subjectId: selectedSubject!.id,
+              levelId: selectedLevel!.id,
+              unitId: matchedUnit?.id || '',
+              order,
+            });
+            count++;
+          });
+          toast({ title: `Imported ${count} lessons` });
+        }}
+      />
+
       {/* Unit Dialog */}
-      <Dialog open={unitDialogOpen} onOpenChange={setUnitDialogOpen}>
+      <Dialog open={unitDialogOpen} onOpenChange={(open) => {
+        setUnitDialogOpen(open);
+        if (!open && pendingLessonForm) {
+          setForm(pendingLessonForm);
+          setDialogOpen(true);
+          setPendingLessonForm(null);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingUnit ? 'Edit Unit' : 'Add Unit'}</DialogTitle>
+            <DialogTitle>Add Unit</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1.5"><Label>Unit Name *</Label><Input value={unitForm.name} onChange={e => setUnitForm({ name: e.target.value })} placeholder="e.g. Unit 1: Basics" /></div>
+            <div><Label>Unit Name *</Label><Input value={unitForm.name} onChange={e => setUnitForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Unit 1: Basics" /></div>
+            <div><Label>Order</Label><Input type="number" min={1} value={unitForm.order} onChange={e => setUnitForm(f => ({ ...f, order: parseInt(e.target.value) || 1 }))} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUnitDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmitUnit} disabled={createUnitMut.isPending || updateUnitMut.isPending}>
-              {editingUnit ? 'Update' : 'Create'}
-            </Button>
+            <Button variant="outline" onClick={() => {
+              setUnitDialogOpen(false);
+              if (pendingLessonForm) {
+                setForm(pendingLessonForm);
+                setDialogOpen(true);
+                setPendingLessonForm(null);
+              }
+            }}>Cancel</Button>
+            <Button onClick={handleSubmitUnit} disabled={createUnitMut.isPending}>Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

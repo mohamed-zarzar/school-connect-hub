@@ -33,6 +33,8 @@ export default function StudentsPage() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [filterLevel, setFilterLevel] = useState<string>('all');
+  const [filterClass, setFilterClass] = useState<string>('all');
 
   const { data: studentsRes, isLoading } = useQuery({ queryKey: ['students'], queryFn: () => studentApi.getAll({ page: 1, limit: 1000 }) });
   const { data: tplRes } = useQuery({ queryKey: ['templates'], queryFn: () => templateApi.get() });
@@ -98,8 +100,32 @@ export default function StudentsPage() {
         </div>
         <Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" />Add Student</Button>
       </div>
+      {/* Filters */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={filterLevel} onValueChange={v => { setFilterLevel(v); setFilterClass('all'); }}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Levels" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Levels</SelectItem>
+            {(levelsRes?.data || []).map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterClass} onValueChange={setFilterClass}>
+          <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Classes" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Classes</SelectItem>
+            {(classesRes?.data || []).filter((c: any) => filterLevel === 'all' || c.levelId === filterLevel).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {(filterLevel !== 'all' || filterClass !== 'all') && (
+          <Button variant="ghost" size="sm" onClick={() => { setFilterLevel('all'); setFilterClass('all'); }}>Clear filters</Button>
+        )}
+      </div>
       <DataTable
-        data={studentsRes?.data || []}
+        data={(studentsRes?.data || []).filter((s: Student) => {
+          if (filterLevel !== 'all' && s.levelId !== filterLevel) return false;
+          if (filterClass !== 'all' && s.classId !== filterClass) return false;
+          return true;
+        })}
         columns={columns}
         isLoading={isLoading}
         searchPlaceholder="Search students..."

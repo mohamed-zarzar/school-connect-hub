@@ -18,10 +18,11 @@ import { AttendanceCalendarView } from '@/components/AttendanceCalendarView';
 import { ViewToggle } from '@/components/ViewToggle';
 import { toast } from 'sonner';
 import { managerAttendanceApi } from '@/services/attendance-api';
-import { managerApi } from '@/services/api';
+import { managerApi, classApi, levelApi } from '@/services/api';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { exportToExcel } from '@/lib/excel-utils';
 import { AttendanceQRScanner } from '@/components/AttendanceQRScanner';
+import { DatePickerField } from '@/components/DatePickerField';
 import type { ManagerAbsence, ManagerLate, AttendanceFilter } from '@/types/attendance';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -51,7 +52,11 @@ export default function ManagerAttendance() {
   const [bulkRows, setBulkRows] = useState<{ managerId: string; date: string; isJustified: boolean; reason?: string; period?: number }[]>([{ managerId: '', date: today(), isJustified: false, period: 10 }]);
 
   const { data: managersRes } = useQuery({ queryKey: ['managers-all'], queryFn: () => managerApi.getAll({ page: 1, limit: 1000 }) });
+  const { data: classesRes } = useQuery({ queryKey: ['classes-all'], queryFn: () => classApi.getAll({ page: 1, limit: 1000 }) });
+  const { data: levelsRes } = useQuery({ queryKey: ['levels-all'], queryFn: () => levelApi.getAll({ page: 1, limit: 1000 }) });
   const managers = managersRes?.data || [];
+  const classes = classesRes?.data || [];
+  const levels = levelsRes?.data || [];
 
   const { data: absencesRes, isLoading: absLoading } = useQuery({ queryKey: ['manager-absences', filter], queryFn: () => managerAttendanceApi.getAbsences(filter) });
   const { data: latesRes, isLoading: lateLoading } = useQuery({ queryKey: ['manager-lates', filter], queryFn: () => managerAttendanceApi.getLates(filter) });
@@ -64,14 +69,18 @@ export default function ManagerAttendance() {
   const filteredAbsences = useMemo(() => {
     let items = absences;
     if (filter.entityId) items = items.filter(i => i.managerId === filter.entityId);
+    if (filter.classId) { const mIds = managers.filter(m => m.classIds.includes(filter.classId!)).map(m => m.id); items = items.filter(i => mIds.includes(i.managerId)); }
+    if (filter.levelId) { const cIds = classes.filter(c => c.levelId === filter.levelId).map(c => c.id); const mIds = managers.filter(m => m.classIds.some(cid => cIds.includes(cid))).map(m => m.id); items = items.filter(i => mIds.includes(i.managerId)); }
     return items;
-  }, [absences, filter.entityId]);
+  }, [absences, filter, managers, classes]);
 
   const filteredLates = useMemo(() => {
     let items = lates;
     if (filter.entityId) items = items.filter(i => i.managerId === filter.entityId);
+    if (filter.classId) { const mIds = managers.filter(m => m.classIds.includes(filter.classId!)).map(m => m.id); items = items.filter(i => mIds.includes(i.managerId)); }
+    if (filter.levelId) { const cIds = classes.filter(c => c.levelId === filter.levelId).map(c => c.id); const mIds = managers.filter(m => m.classIds.some(cid => cIds.includes(cid))).map(m => m.id); items = items.filter(i => mIds.includes(i.managerId)); }
     return items;
-  }, [lates, filter.entityId]);
+  }, [lates, filter, managers, classes]);
 
   const invalidate = () => { qc.invalidateQueries({ queryKey: ['manager-absences'] }); qc.invalidateQueries({ queryKey: ['manager-lates'] }); qc.invalidateQueries({ queryKey: ['manager-attendance-stats'] }); };
 
@@ -162,10 +171,28 @@ export default function ManagerAttendance() {
             </div>
             {activeView !== 'calendar' && (
               <>
-                <div className="space-y-1"><Label className="text-xs">Date From</Label><Input type="date" value={filter.dateFrom || ''} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value || undefined }))} className="w-40" /></div>
-                <div className="space-y-1"><Label className="text-xs">Date To</Label><Input type="date" value={filter.dateTo || ''} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value || undefined }))} className="w-40" /></div>
+                <div className="space-y-1 flex flex-col">
+                  <Label className="text-xs">Date From</Label>
+                <DatePickerField value={filter.dateFrom || ''} onChange={v => setFilter(f => ({ ...f, dateFrom: v || undefined }))} placeholder="From date" className="w-40" /></div>
+                <div className="space-y-1 flex flex-col">
+                  <Label className="text-xs">Date To</Label>
+                <DatePickerField value={filter.dateTo || ''} onChange={v => setFilter(f => ({ ...f, dateTo: v || undefined }))} placeholder="To date" className="w-40" /></div>
               </>
             )}
+            <div className="space-y-1">
+              <Label className="text-xs">Level</Label>
+              <Select value={filter.levelId || 'all'} onValueChange={v => setFilter(f => ({ ...f, levelId: v === 'all' ? undefined : v }))}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All Levels</SelectItem>{levels.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Class</Label>
+              <Select value={filter.classId || 'all'} onValueChange={v => setFilter(f => ({ ...f, classId: v === 'all' ? undefined : v }))}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <Button variant="outline" size="sm" onClick={() => setFilter({})}>Clear</Button>
             <div className="ml-auto">
               {tab === 'absences' && <ViewToggle view={absView} onViewChange={setAbsView} />}
@@ -185,9 +212,7 @@ export default function ManagerAttendance() {
         <TabsContent value="absences" className="space-y-4">
           <div className="flex gap-2 flex-wrap items-center">
             <Button size="sm" onClick={() => { resetAbsForm(); setAbsDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Absence</Button>
-            <AttendanceQRScanner entityType="managers" mode="single" onScanned={handleScanSingleAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
             <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ managerId: '', date: today(), isJustified: false }]); setBulkAbsDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
-            <AttendanceQRScanner entityType="managers" mode="bulk" onScanned={handleScanBulkAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportAbsOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
             <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredAbsences.map(a => ({ ...a, managerName: getManagerName(a.managerId), justified: a.isJustified ? 'Yes' : 'No', reason: a.reason || '' })), [{ key: 'managerName', label: 'Manager' }, { key: 'date', label: 'Date' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'manager-absences')}><Download className="mr-2 h-4 w-4" />Export</Button>
           </div>
@@ -265,7 +290,7 @@ export default function ManagerAttendance() {
           <DialogHeader><DialogTitle>{editingAbsence ? 'Edit Absence' : 'Add Absence'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Manager</Label><Select value={formManagerId} onValueChange={setFormManagerId}><SelectTrigger><SelectValue placeholder="Select manager" /></SelectTrigger><SelectContent>{managers.map(m => <SelectItem key={m.id} value={m.id}>{m.firstname} {m.lastname}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Date</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Date</Label><DatePickerField value={formDate} onChange={setFormDate} /></div>
             <div className="flex items-center gap-2"><Switch checked={formJustified} onCheckedChange={v => { setFormJustified(v); if (!v) setFormReason(''); }} /><Label>Justified</Label></div>
             {formJustified && <div className="space-y-2"><Label>Reason</Label><Textarea value={formReason} onChange={e => setFormReason(e.target.value)} placeholder="Enter justification reason..." /></div>}
           </div>
@@ -279,7 +304,7 @@ export default function ManagerAttendance() {
           <DialogHeader><DialogTitle>{editingLate ? 'Edit Late' : 'Add Late'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><Label>Manager</Label><Select value={formManagerId} onValueChange={setFormManagerId}><SelectTrigger><SelectValue placeholder="Select manager" /></SelectTrigger><SelectContent>{managers.map(m => <SelectItem key={m.id} value={m.id}>{m.firstname} {m.lastname}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Date</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Date</Label><DatePickerField value={formDate} onChange={setFormDate} /></div>
             <div className="space-y-2"><Label>Period of Late (minutes)</Label><Input type="number" min={1} value={formPeriod} onChange={e => setFormPeriod(parseInt(e.target.value) || 0)} /></div>
             <div className="flex items-center gap-2"><Switch checked={formJustified} onCheckedChange={v => { setFormJustified(v); if (!v) setFormReason(''); }} /><Label>Justified</Label></div>
             {formJustified && <div className="space-y-2"><Label>Reason</Label><Textarea value={formReason} onChange={e => setFormReason(e.target.value)} placeholder="Enter justification reason..." /></div>}
@@ -296,7 +321,7 @@ export default function ManagerAttendance() {
             {bulkRows.map((row, idx) => (
               <div key={idx} className="flex gap-2 items-end flex-wrap border-b border-border pb-2">
                 <div className="flex-1 min-w-[140px] space-y-1"><Label className="text-xs">Manager</Label><Select value={row.managerId} onValueChange={v => updateBulkRow(idx, 'managerId', v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{managers.map(m => <SelectItem key={m.id} value={m.id}>{m.firstname} {m.lastname}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={row.date} onChange={e => updateBulkRow(idx, 'date', e.target.value)} className="w-36" /></div>
+                <div className="space-y-1"><Label className="text-xs">Date</Label><DatePickerField value={row.date} onChange={v => updateBulkRow(idx, 'date', v)} className="w-36" /></div>
                 <div className="flex items-center gap-1 pb-1"><Switch checked={row.isJustified} onCheckedChange={v => { updateBulkRow(idx, 'isJustified', v); if (!v) updateBulkRow(idx, 'reason', ''); }} /><Label className="text-xs">J</Label></div>
                 {row.isJustified && <div className="w-full space-y-1"><Label className="text-xs">Reason</Label><Input value={row.reason || ''} onChange={e => updateBulkRow(idx, 'reason', e.target.value)} placeholder="Reason..." /></div>}
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => removeBulkRow(idx)} disabled={bulkRows.length === 1}><Trash2 className="h-4 w-4" /></Button>
@@ -316,7 +341,7 @@ export default function ManagerAttendance() {
             {bulkRows.map((row, idx) => (
               <div key={idx} className="flex gap-2 items-end flex-wrap border-b border-border pb-2">
                 <div className="flex-1 min-w-[140px] space-y-1"><Label className="text-xs">Manager</Label><Select value={row.managerId} onValueChange={v => updateBulkRow(idx, 'managerId', v)}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{managers.map(m => <SelectItem key={m.id} value={m.id}>{m.firstname} {m.lastname}</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={row.date} onChange={e => updateBulkRow(idx, 'date', e.target.value)} className="w-36" /></div>
+                <div className="space-y-1"><Label className="text-xs">Date</Label><DatePickerField value={row.date} onChange={v => updateBulkRow(idx, 'date', v)} className="w-36" /></div>
                 <div className="space-y-1"><Label className="text-xs">Min</Label><Input type="number" min={1} value={row.period ?? 10} onChange={e => updateBulkRow(idx, 'period', parseInt(e.target.value) || 0)} className="w-20" /></div>
                 <div className="flex items-center gap-1 pb-1"><Switch checked={row.isJustified} onCheckedChange={v => { updateBulkRow(idx, 'isJustified', v); if (!v) updateBulkRow(idx, 'reason', ''); }} /><Label className="text-xs">J</Label></div>
                 {row.isJustified && <div className="w-full space-y-1"><Label className="text-xs">Reason</Label><Input value={row.reason || ''} onChange={e => updateBulkRow(idx, 'reason', e.target.value)} placeholder="Reason..." /></div>}

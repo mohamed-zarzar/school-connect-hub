@@ -22,6 +22,7 @@ import { studentApi, classApi, levelApi } from '@/services/api';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { exportToExcel } from '@/lib/excel-utils';
 import { AttendanceQRScanner } from '@/components/AttendanceQRScanner';
+import { DatePickerField } from '@/components/DatePickerField';
 import type { StudentAbsence, StudentLate, AttendanceFilter } from '@/types/attendance';
 import type { Student, SchoolClass, Level } from '@/types';
 
@@ -191,8 +192,8 @@ export default function StudentAttendance() {
             </div>
             {activeView !== 'calendar' && (
               <>
-                <div className="space-y-1"><Label className="text-xs">Date From</Label><Input type="date" value={filter.dateFrom || ''} onChange={e => setFilter(f => ({ ...f, dateFrom: e.target.value || undefined }))} className="w-40" /></div>
-                <div className="space-y-1"><Label className="text-xs">Date To</Label><Input type="date" value={filter.dateTo || ''} onChange={e => setFilter(f => ({ ...f, dateTo: e.target.value || undefined }))} className="w-40" /></div>
+                <div className="space-y-1 flex flex-col"><Label className="text-xs">Date From</Label><DatePickerField value={filter.dateFrom || ''} onChange={v => setFilter(f => ({ ...f, dateFrom: v || undefined }))} placeholder="From date" className="w-40" /></div>
+                <div className="space-y-1 flex flex-col"><Label className="text-xs">Date To</Label><DatePickerField value={filter.dateTo || ''} onChange={v => setFilter(f => ({ ...f, dateTo: v || undefined }))} placeholder="To date" className="w-40" /></div>
               </>
             )}
             <div className="space-y-1">
@@ -228,9 +229,7 @@ export default function StudentAttendance() {
         <TabsContent value="absences" className="space-y-4">
           <div className="flex gap-2 flex-wrap items-center">
             <Button size="sm" onClick={() => { resetAbsForm(); setAbsDialog(true); }}><Plus className="mr-2 h-4 w-4" />Add Absence</Button>
-            <AttendanceQRScanner entityType="students" mode="single" onScanned={handleScanSingleAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Scan Add</Button>} />
             <Button size="sm" variant="outline" onClick={() => { setBulkRows([{ studentId: '', date: today(), isJustified: false }]); setBulkAbsDialog(true); }}><ListPlus className="mr-2 h-4 w-4" />Bulk Add</Button>
-            <AttendanceQRScanner entityType="students" mode="bulk" onScanned={handleScanBulkAbs} trigger={<Button size="sm" variant="outline"><ScanLine className="mr-2 h-4 w-4" />Bulk Scan</Button>} />
             <Button size="sm" variant="outline" onClick={() => setImportAbsOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
             <Button size="sm" variant="outline" onClick={() => exportToExcel(filteredAbsences.map(a => ({ ...a, studentName: getStudentName(a.studentId), justified: a.isJustified ? 'Yes' : 'No', reason: a.reason || '' })), [{ key: 'studentName', label: 'Student' }, { key: 'date', label: 'Date' }, { key: 'justified', label: 'Justified' }, { key: 'reason', label: 'Reason' }], 'student-absences')}><Download className="mr-2 h-4 w-4" />Export</Button>
           </div>
@@ -340,7 +339,7 @@ export default function StudentAttendance() {
                 <SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.firstname} {s.lastname}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Date</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Date</Label><DatePickerField value={formDate} onChange={setFormDate} /></div>
             <div className="flex items-center gap-2"><Switch checked={formJustified} onCheckedChange={v => { setFormJustified(v); if (!v) setFormReason(''); }} /><Label>Justified</Label></div>
             {formJustified && <div className="space-y-2"><Label>Reason</Label><Textarea value={formReason} onChange={e => setFormReason(e.target.value)} placeholder="Enter justification reason..." /></div>}
           </div>
@@ -363,7 +362,7 @@ export default function StudentAttendance() {
                 <SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.firstname} {s.lastname}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Date</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Date</Label><DatePickerField value={formDate} onChange={setFormDate} /></div>
             <div className="space-y-2"><Label>Period of Late (minutes)</Label><Input type="number" min={1} value={formPeriod} onChange={e => setFormPeriod(parseInt(e.target.value) || 0)} /></div>
             <div className="flex items-center gap-2"><Switch checked={formJustified} onCheckedChange={v => { setFormJustified(v); if (!v) setFormReason(''); }} /><Label>Justified</Label></div>
             {formJustified && <div className="space-y-2"><Label>Reason</Label><Textarea value={formReason} onChange={e => setFormReason(e.target.value)} placeholder="Enter justification reason..." /></div>}
@@ -389,7 +388,7 @@ export default function StudentAttendance() {
                     <SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.firstname} {s.lastname}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={row.date} onChange={e => updateBulkRow(idx, 'date', e.target.value)} className="w-36" /></div>
+                <div className="space-y-1"><Label className="text-xs">Date</Label><DatePickerField value={row.date} onChange={v => updateBulkRow(idx, 'date', v)} className="w-36" /></div>
                 <div className="flex items-center gap-1 pb-1"><Switch checked={row.isJustified} onCheckedChange={v => { updateBulkRow(idx, 'isJustified', v); if (!v) updateBulkRow(idx, 'reason', ''); }} /><Label className="text-xs">J</Label></div>
                 {row.isJustified && <div className="w-full space-y-1"><Label className="text-xs">Reason</Label><Input value={row.reason || ''} onChange={e => updateBulkRow(idx, 'reason', e.target.value)} placeholder="Reason..." /></div>}
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => removeBulkRow(idx)} disabled={bulkRows.length === 1}><Trash2 className="h-4 w-4" /></Button>
@@ -418,7 +417,7 @@ export default function StudentAttendance() {
                     <SelectContent>{students.map(s => <SelectItem key={s.id} value={s.id}>{s.firstname} {s.lastname}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1"><Label className="text-xs">Date</Label><Input type="date" value={row.date} onChange={e => updateBulkRow(idx, 'date', e.target.value)} className="w-36" /></div>
+                <div className="space-y-1"><Label className="text-xs">Date</Label><DatePickerField value={row.date} onChange={v => updateBulkRow(idx, 'date', v)} className="w-36" /></div>
                 <div className="space-y-1"><Label className="text-xs">Period (min)</Label><Input type="number" min={1} value={row.period ?? 10} onChange={e => updateBulkRow(idx, 'period', parseInt(e.target.value) || 0)} className="w-24" /></div>
                 <div className="flex items-center gap-1 pb-1"><Switch checked={row.isJustified} onCheckedChange={v => { updateBulkRow(idx, 'isJustified', v); if (!v) updateBulkRow(idx, 'reason', ''); }} /><Label className="text-xs">J</Label></div>
                 {row.isJustified && <div className="w-full space-y-1"><Label className="text-xs">Reason</Label><Input value={row.reason || ''} onChange={e => updateBulkRow(idx, 'reason', e.target.value)} placeholder="Reason..." /></div>}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { AttendanceCalendarView } from '@/components/AttendanceCalendarView';
+import { DatePickerField } from '@/components/DatePickerField';
 import { ViewToggle } from '@/components/ViewToggle';
 import { toast } from 'sonner';
 import { studentAttendanceApi, teacherAttendanceApi, managerAttendanceApi, getSessionOptions } from '@/services/attendance-api';
@@ -32,6 +33,10 @@ export function EntityAttendanceTab({ entityType, entityId, entityName, recordTy
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+
+  // Date filters
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const [formDate, setFormDate] = useState(today());
   const [formJustified, setFormJustified] = useState(false);
@@ -61,8 +66,16 @@ export function EntityAttendanceTab({ entityType, entityId, entityName, recordTy
   };
 
   const isAbsences = recordType === 'absences';
-  const items: any[] = isAbsences ? (absQuery.data?.data || []) : (lateQuery.data?.data || []);
+  const rawItems: any[] = isAbsences ? (absQuery.data?.data || []) : (lateQuery.data?.data || []);
   const isLoading = isAbsences ? absQuery.isLoading : lateQuery.isLoading;
+
+  // Apply date filters
+  const items = useMemo(() => {
+    let filtered = rawItems;
+    if (dateFrom) filtered = filtered.filter(i => i.date >= dateFrom);
+    if (dateTo) filtered = filtered.filter(i => i.date <= dateTo);
+    return filtered;
+  }, [rawItems, dateFrom, dateTo]);
 
   const createMut = useMutation({
     mutationFn: (data: any) => {
@@ -123,11 +136,26 @@ export function EntityAttendanceTab({ entityType, entityId, entityName, recordTy
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-between justify-between flex-wrap gap-2">
         <p className="text-sm text-muted-foreground">{items.length} {recordType} for {entityName}</p>
-        <div className="flex items-center gap-2">
-          <ViewToggle view={viewMode} onViewChange={setViewMode} />
-          <Button size="sm" onClick={() => { resetForm(); setEditingId(null); setDialogOpen(true); }}>
+        <div className="flex  gap-2 flex-wrap ">
+          {viewMode !== 'calendar' && (
+            <>
+              <div className="h-full flex flex-col justify-end ">
+                <Label className="text-xs">From</Label>
+                <DatePickerField value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-36 h-8" />
+              </div>
+              <div className="h-full flex flex-col justify-end">
+                <Label className="text-xs">To</Label>
+                <DatePickerField value={dateTo} onChange={setDateTo} placeholder="To date" className="w-36 h-8" />
+              </div>
+              {(dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); }} className="mt-4">Clear</Button>
+              )}
+            </>
+          )}
+          <div className="mt-4 flex flex-col justify-end"><ViewToggle view={viewMode} onViewChange={setViewMode} /></div>
+          <Button size="sm" className="mt-4" onClick={() => { resetForm(); setEditingId(null); setDialogOpen(true); }}>
             <Plus className="mr-2 h-4 w-4" />Add {isAbsences ? 'Absence' : 'Late'}
           </Button>
         </div>
@@ -135,7 +163,7 @@ export function EntityAttendanceTab({ entityType, entityId, entityName, recordTy
 
       {isLoading ? <Skeleton className="h-48 w-full" /> : viewMode === 'calendar' ? (
         <AttendanceCalendarView
-        isShowMixed={false}
+          isShowMixed={false}
           items={items}
           type={recordType}
           showEntity={false}
@@ -192,7 +220,7 @@ export function EntityAttendanceTab({ entityType, entityId, entityName, recordTy
                 </Select>
               </div>
             )}
-            <div className="space-y-2"><Label>Date</Label><Input type="date" value={formDate} onChange={e => setFormDate(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Date</Label><DatePickerField value={formDate} onChange={setFormDate} /></div>
             {!isAbsences && <div className="space-y-2"><Label>Period (minutes)</Label><Input type="number" min={1} value={formPeriod} onChange={e => setFormPeriod(parseInt(e.target.value) || 0)} /></div>}
             <div className="flex items-center gap-2"><Switch checked={formJustified} onCheckedChange={v => { setFormJustified(v); if (!v) setFormReason(''); }} /><Label>Justified</Label></div>
             {formJustified && <div className="space-y-2"><Label>Reason</Label><Textarea value={formReason} onChange={e => setFormReason(e.target.value)} placeholder="Enter reason..." /></div>}

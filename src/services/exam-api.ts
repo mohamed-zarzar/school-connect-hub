@@ -53,6 +53,12 @@ export const unitApi = {
   },
   create: async (data: Omit<Unit, 'id' | 'createdAt'>): Promise<ApiResponse<Unit>> => {
     await delay();
+    // Shift orders if inserting at existing position
+    const sameScope = units.filter(u => u.subjectId === data.subjectId && u.levelId === data.levelId);
+    sameScope.filter(u => u.order >= data.order).forEach(u => {
+      const idx = units.findIndex(x => x.id === u.id);
+      if (idx !== -1) units[idx] = { ...units[idx], order: units[idx].order + 1 };
+    });
     const newItem: Unit = { ...data, id: genId('unit'), createdAt: new Date().toISOString() };
     units = [...units, newItem];
     return { data: newItem, message: 'Unit created', success: true, statusCode: 201 };
@@ -61,9 +67,24 @@ export const unitApi = {
     await delay();
     const idx = units.findIndex(u => u.id === id);
     if (idx === -1) return { data: null as any, message: 'Not found', success: false, statusCode: 404 };
-    units[idx] = { ...units[idx], ...data };
+    const oldUnit = units[idx];
+    // Handle order shifting
+    if (data.order !== undefined && data.order !== oldUnit.order) {
+      const sameScope = units.filter(u => u.subjectId === oldUnit.subjectId && u.levelId === oldUnit.levelId && u.id !== id);
+      const sorted = [...sameScope].sort((a, b) => a.order - b.order);
+      // Remove the current unit from the list, then insert at new position
+      const reordered = sorted.filter(u => u.id !== id);
+      const insertAt = Math.max(0, Math.min(data.order - 1, reordered.length));
+      reordered.splice(insertAt, 0, { ...oldUnit, ...data } as Unit);
+      reordered.forEach((u, i) => {
+        const uidx = units.findIndex(x => x.id === u.id);
+        if (uidx !== -1) units[uidx] = { ...units[uidx], order: i + 1 };
+      });
+    } else {
+      units[idx] = { ...units[idx], ...data };
+    }
     units = [...units];
-    return { data: units[idx], message: 'Updated', success: true, statusCode: 200 };
+    return { data: units[units.findIndex(u => u.id === id)], message: 'Updated', success: true, statusCode: 200 };
   },
   delete: async (id: string): Promise<ApiResponse<null>> => {
     await delay();
@@ -128,9 +149,22 @@ export const lessonApi = {
     await delay();
     const idx = lessons.findIndex(l => l.id === id);
     if (idx === -1) return { data: null as any, message: 'Not found', success: false, statusCode: 404 };
-    lessons[idx] = { ...lessons[idx], ...data };
+    const oldLesson = lessons[idx];
+    // Handle order shifting
+    if (data.order !== undefined && data.order !== oldLesson.order) {
+      const sameScope = lessons.filter(l => l.subjectId === oldLesson.subjectId && l.levelId === oldLesson.levelId && l.unitId === oldLesson.unitId && l.id !== id);
+      const sorted = [...sameScope].sort((a, b) => a.order - b.order);
+      const insertAt = Math.max(0, Math.min(data.order - 1, sorted.length));
+      sorted.splice(insertAt, 0, { ...oldLesson, ...data } as Lesson);
+      sorted.forEach((l, i) => {
+        const lidx = lessons.findIndex(x => x.id === l.id);
+        if (lidx !== -1) lessons[lidx] = { ...lessons[lidx], order: i + 1 };
+      });
+    } else {
+      lessons[idx] = { ...lessons[idx], ...data };
+    }
     lessons = [...lessons];
-    return { data: lessons[idx], message: 'Updated', success: true, statusCode: 200 };
+    return { data: lessons[lessons.findIndex(l => l.id === id)], message: 'Updated', success: true, statusCode: 200 };
   },
   delete: async (id: string): Promise<ApiResponse<null>> => {
     await delay();
@@ -146,6 +180,20 @@ export const lessonApi = {
     });
     lessons = [...lessons];
     return { data: null, message: 'Reordered', success: true, statusCode: 200 };
+  },
+  moveToUnit: async (lessonId: string, newUnitId: string, targetLessonIds: string[]): Promise<ApiResponse<null>> => {
+    await delay();
+    const idx = lessons.findIndex(l => l.id === lessonId);
+    if (idx !== -1) {
+      lessons[idx] = { ...lessons[idx], unitId: newUnitId };
+    }
+    // Reorder lessons in the target container
+    targetLessonIds.forEach((id, i) => {
+      const l = lessons.find(l => l.id === id);
+      if (l) l.order = i + 1;
+    });
+    lessons = [...lessons];
+    return { data: null, message: 'Moved', success: true, statusCode: 200 };
   },
 };
 
@@ -220,7 +268,17 @@ export const examApi = {
         ...pick(pool.filter(q => q.difficulty === 'hard'), config.hardCount || 0),
       ];
     }
-    const exam: Exam = { id: genId('exam'), name: config.name, lessonIds: config.lessonIds, questionIds: selectedQuestionIds, createdAt: new Date().toISOString(), status: 'published' };
+    const exam: Exam = {
+      id: genId('exam'),
+      name: config.name,
+      levelId: config.levelId,
+      subjectId: config.subjectId,
+      lessonIds: config.lessonIds,
+      questionIds: selectedQuestionIds,
+      maxScore: config.maxScore ?? 100,
+      createdAt: new Date().toISOString(),
+      status: 'published',
+    };
     exams = [...exams, exam];
     return { data: exam, message: 'Exam generated', success: true, statusCode: 201 };
   },
@@ -228,6 +286,17 @@ export const examApi = {
     await delay();
     exams = exams.filter(e => e.id !== id);
     return { data: null, message: 'Deleted', success: true, statusCode: 200 };
+  },
+  getQuestionsForExam: async (examId: string): Promise<ApiResponse<Question[]>> => {
+    await delay();
+    const exam = exams.find(e => e.id === examId);
+    if (!exam) return { data: [], message: 'Exam not found', success: false, statusCode: 404 };
+    const examQuestions = questions.filter(q => exam.questionIds.includes(q.id));
+    // Preserve the order defined in exam.questionIds
+    const ordered = exam.questionIds
+      .map(qId => examQuestions.find(q => q.id === qId))
+      .filter((q): q is Question => !!q);
+    return { data: ordered, message: 'Success', success: true, statusCode: 200 };
   },
 };
 
