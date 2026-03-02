@@ -284,6 +284,14 @@ export const examApi = {
     exams = [...exams, exam];
     return { data: exam, message: 'Exam generated', success: true, statusCode: 201 };
   },
+  update: async (id: string, data: Partial<Exam>): Promise<ApiResponse<Exam>> => {
+    await delay();
+    const idx = exams.findIndex(e => e.id === id);
+    if (idx === -1) return { data: null as any, message: 'Not found', success: false, statusCode: 404 };
+    exams[idx] = { ...exams[idx], ...data };
+    exams = [...exams];
+    return { data: exams[idx], message: 'Updated', success: true, statusCode: 200 };
+  },
   delete: async (id: string): Promise<ApiResponse<null>> => {
     await delay();
     exams = exams.filter(e => e.id !== id);
@@ -319,6 +327,17 @@ export const attemptApi = {
     await delay();
     return { data: attempts.filter(a => a.examId === examId), message: 'Success', success: true, statusCode: 200 };
   },
+  addManual: async (examId: string, studentId: string, score: number): Promise<ApiResponse<ExamAttempt>> => {
+    await delay();
+    const exam = exams.find(e => e.id === examId);
+    if (!exam) return { data: null as any, message: 'Exam not found', success: false, statusCode: 404 };
+    const attempt: ExamAttempt = {
+      id: genId('att'), examId, studentId, answers: {}, score,
+      totalQuestions: exam.questionIds.length, completedAt: new Date().toISOString(),
+    };
+    attempts = [...attempts, attempt];
+    return { data: attempt, message: 'Score added', success: true, statusCode: 201 };
+  },
 };
 
 // ── External Exam API ──
@@ -341,6 +360,14 @@ export const externalExamApi = {
     const newItem: ExternalExam = { ...data, id: genId('ext-exam'), createdAt: new Date().toISOString() };
     externalExams = [...externalExams, newItem];
     return { data: newItem, message: 'External exam created', success: true, statusCode: 201 };
+  },
+  update: async (id: string, data: Partial<ExternalExam>): Promise<ApiResponse<ExternalExam>> => {
+    await delay();
+    const idx = externalExams.findIndex(e => e.id === id);
+    if (idx === -1) return { data: null as any, message: 'Not found', success: false, statusCode: 404 };
+    externalExams[idx] = { ...externalExams[idx], ...data };
+    externalExams = [...externalExams];
+    return { data: externalExams[idx], message: 'Updated', success: true, statusCode: 200 };
   },
   delete: async (id: string): Promise<ApiResponse<null>> => {
     await delay();
@@ -366,5 +393,16 @@ export const externalExamApi = {
   getAttempts: async (externalExamId: string): Promise<ApiResponse<ExternalExamAttempt[]>> => {
     await delay();
     return { data: externalAttempts.filter(a => a.externalExamId === externalExamId), message: 'Success', success: true, statusCode: 200 };
+  },
+  addManualScore: async (externalExamId: string, studentId: string, score: number): Promise<ApiResponse<ExternalExamAttempt>> => {
+    await delay();
+    const exam = externalExams.find(e => e.id === externalExamId);
+    if (!exam) return { data: null as any, message: 'Not found', success: false, statusCode: 404 };
+    const attempt: ExternalExamAttempt = {
+      id: genId('ext-att'), externalExamId, studentId, answers: {}, score,
+      totalQuestions: exam.totalQuestions, completedAt: new Date().toISOString(),
+    };
+    externalAttempts = [...externalAttempts, attempt];
+    return { data: attempt, message: 'Score added', success: true, statusCode: 201 };
   },
 };

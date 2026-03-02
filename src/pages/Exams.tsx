@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2, Play, Search, Camera, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Play, Search, Camera, Download, Upload, Edit, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { PrintExamQuestions } from '@/components/PrintExamQuestions';
@@ -201,6 +201,7 @@ export default function Exams() {
                   <TableCell>{exam.maxScore}</TableCell>
                   <TableCell><Badge variant={exam.status === 'published' ? 'default' : 'outline'}>{exam.status}</Badge></TableCell>
                   <TableCell className="text-right space-x-1">
+                    <Button variant="ghost" size="icon" onClick={() => navigate(`/exams/${exam.id}`)} title="View Details"><Eye className="h-4 w-4" /></Button>
                     <PrintQuestionsButton exam={exam} />
                     <PrintAnswerSheet />
                     <Button variant="ghost" size="icon" title="Export to Excel" onClick={async () => {
@@ -215,7 +216,7 @@ export default function Exams() {
                       ];
                       exportToExcel(qs, cols, `exam-${exam.name}`);
                     }}><Download className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => navigate(`/exams/${exam.id}/scan`)} title="تصحيح بالكاميرا"><Camera className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => navigate(`/exams/${exam.id}/scan`)} title="Scan"><Camera className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => navigate(`/exams/${exam.id}/take`)}><Play className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => deleteMut.mutate(exam.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </TableCell>

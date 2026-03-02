@@ -16,9 +16,10 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Plus, Trash2, Camera, Upload, Send, ArrowLeft, CheckCircle2, XCircle,
-  AlertTriangle, RotateCcw, ImageIcon, FileSpreadsheet,
+  AlertTriangle, RotateCcw, ImageIcon, FileSpreadsheet, Eye, Edit,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import type { ExternalExam, ExternalExamAttempt } from '@/types/exam';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
@@ -27,6 +28,7 @@ type Step = 'list' | 'create' | 'correct' | 'camera' | 'review' | 'result';
 
 export default function ExternalExams() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [step, setStep] = useState<Step>('list');
@@ -504,6 +506,7 @@ export default function ExternalExams() {
                   <TableCell><Badge variant="secondary">{exam.totalQuestions}</Badge></TableCell>
                   <TableCell className="text-muted-foreground text-sm">{new Date(exam.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right space-x-1">
+                    <Button variant="ghost" size="icon" onClick={() => navigate(`/external-exams/${exam.id}`)} title="View Details"><Eye className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => openCorrect(exam)} title="Correct"><Camera className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => deleteMut.mutate(exam.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </TableCell>
