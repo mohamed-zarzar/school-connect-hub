@@ -102,7 +102,14 @@ export default function ExamDetail() {
             </div>
           </div>
         </div>
-        <Button variant="outline" onClick={openEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+          <Button variant="destructive" onClick={() => {
+            if (confirm('Delete this exam?')) {
+              examApi.delete(id!).then(() => { navigate('/exams'); });
+            }
+          }}><Trash2 className="h-4 w-4 mr-2" /> Delete</Button>
+        </div>
       </div>
 
       <Tabs defaultValue="info">

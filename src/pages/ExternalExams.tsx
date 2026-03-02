@@ -507,6 +507,7 @@ export default function ExternalExams() {
                   <TableCell className="text-muted-foreground text-sm">{new Date(exam.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button variant="ghost" size="icon" onClick={() => navigate(`/external-exams/${exam.id}`)} title="View Details"><Eye className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => navigate(`/external-exams/${exam.id}`)} title="Edit"><Edit className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => openCorrect(exam)} title="Correct"><Camera className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => deleteMut.mutate(exam.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </TableCell>

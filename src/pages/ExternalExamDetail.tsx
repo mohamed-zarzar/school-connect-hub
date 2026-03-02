@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Edit, Plus, BookOpen, Users } from 'lucide-react';
+import { ArrowLeft, Edit, Plus, Trash2, BookOpen, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
@@ -86,7 +86,14 @@ export default function ExternalExamDetail() {
             <p className="text-sm text-muted-foreground">{exam.totalQuestions} questions · Created {new Date(exam.createdAt).toLocaleDateString()}</p>
           </div>
         </div>
-        <Button variant="outline" onClick={openEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={openEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+          <Button variant="destructive" onClick={() => {
+            if (confirm('Delete this external exam?')) {
+              externalExamApi.delete(id!).then(() => { navigate('/external-exams'); });
+            }
+          }}><Trash2 className="h-4 w-4 mr-2" /> Delete</Button>
+        </div>
       </div>
 
       <Tabs defaultValue="info">
