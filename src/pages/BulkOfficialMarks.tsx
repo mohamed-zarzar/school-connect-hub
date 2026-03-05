@@ -159,13 +159,17 @@ export default function BulkOfficialMarks() {
     const row = rows.find(r => r.key === key);
     if (!row) return;
     
+    // Check uniqueness
+    if (studentId && row.subjectId && usedCombos.has(`${studentId}__${row.subjectId}`) && row.studentId !== studentId) {
+      toast.error('This student + subject combination already exists in the table');
+      return;
+    }
+    
     updateRow(key, 'studentId', studentId);
     
-    // Auto-fill level/class info from student
     const student = students.find(s => s.id === studentId);
     if (!student) return;
 
-    // If subject is set, try to load existing record
     if (row.subjectId) {
       const res = await markRecordApi.findOfficialRecord(studentId, row.subjectId);
       if (res.data) {
@@ -185,6 +189,12 @@ export default function BulkOfficialMarks() {
   const handleSubjectSelect = async (key: string, subjectId: string) => {
     const row = rows.find(r => r.key === key);
     if (!row) return;
+
+    // Check uniqueness
+    if (row.studentId && subjectId && usedCombos.has(`${row.studentId}__${subjectId}`) && row.subjectId !== subjectId) {
+      toast.error('This student + subject combination already exists in the table');
+      return;
+    }
 
     updateRow(key, 'subjectId', subjectId);
 
