@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { markRecordApi } from '@/services/mark-record-api';
@@ -11,8 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Save, Plus, Trash2, ArrowLeft, Check } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Save, Plus, Trash2, ArrowLeft, Check, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface BulkRow {
   key: string; // unique key for React
@@ -129,6 +132,15 @@ export default function BulkOfficialMarks() {
     setRows(prev => prev.filter(r => r.key !== key));
   };
 
+  // Track used student+subject combos for uniqueness
+  const usedCombos = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach(r => {
+      if (r.studentId && r.subjectId) set.add(`${r.studentId}__${r.subjectId}`);
+    });
+    return set;
+  }, [rows]);
+
   const updateRow = (key: string, field: string, value: any) => {
     setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value, saved: false } : r));
   };
@@ -147,13 +159,17 @@ export default function BulkOfficialMarks() {
     const row = rows.find(r => r.key === key);
     if (!row) return;
     
+    // Check uniqueness
+    if (studentId && row.subjectId && usedCombos.has(`${studentId}__${row.subjectId}`) && row.studentId !== studentId) {
+      toast.error('This student + subject combination already exists in the table');
+      return;
+    }
+    
     updateRow(key, 'studentId', studentId);
     
-    // Auto-fill level/class info from student
     const student = students.find(s => s.id === studentId);
     if (!student) return;
 
-    // If subject is set, try to load existing record
     if (row.subjectId) {
       const res = await markRecordApi.findOfficialRecord(studentId, row.subjectId);
       if (res.data) {
@@ -173,6 +189,12 @@ export default function BulkOfficialMarks() {
   const handleSubjectSelect = async (key: string, subjectId: string) => {
     const row = rows.find(r => r.key === key);
     if (!row) return;
+
+    // Check uniqueness
+    if (row.studentId && subjectId && usedCombos.has(`${row.studentId}__${subjectId}`) && row.subjectId !== subjectId) {
+      toast.error('This student + subject combination already exists in the table');
+      return;
+    }
 
     updateRow(key, 'subjectId', subjectId);
 
@@ -322,15 +344,12 @@ export default function BulkOfficialMarks() {
                 <TableRow key={row.key} className={row.saved ? 'bg-green-50 dark:bg-green-950/20' : ''}>
                   <TableCell className="font-mono text-xs text-muted-foreground sticky left-0 bg-background z-10">{idx + 1}</TableCell>
                   <TableCell>
-                    <Select value={row.studentId || 'none'} onValueChange={v => handleStudentSelect(row.key, v === 'none' ? '' : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select student" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select student</SelectItem>
-                        {availableStudents.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.firstname} {s.lastname}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <StudentCombobox
+                      students={availableStudents}
+                      value={row.studentId}
+                      onSelect={(id) => handleStudentSelect(row.key, id)}
+                      getStudentName={getStudentName}
+                    />
                   </TableCell>
                   <TableCell>
                     <Select value={row.subjectId || 'none'} onValueChange={v => handleSubjectSelect(row.key, v === 'none' ? '' : v)}>
@@ -401,5 +420,54 @@ export default function BulkOfficialMarks() {
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Searchable Student Combobox ─────────────────────────────────
+function StudentCombobox({ students, value, onSelect, getStudentName }: {
+  students: any[];
+  value: string;
+  onSelect: (id: string) => void;
+  getStudentName: (id: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-8 w-full justify-between text-xs font-normal"
+        >
+          <span className="truncate">
+            {value ? getStudentName(value) : 'Select student...'}
+          </span>
+          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[220px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search student..." className="h-8 text-xs" />
+          <CommandList>
+            <CommandEmpty>No student found.</CommandEmpty>
+            <CommandGroup>
+              {students.map(s => (
+                <CommandItem
+                  key={s.id}
+                  value={`${s.firstname} ${s.lastname}`}
+                  onSelect={() => { onSelect(s.id); setOpen(false); }}
+                  className="text-xs"
+                >
+                  <Check className={cn("mr-2 h-3 w-3", value === s.id ? "opacity-100" : "opacity-0")} />
+                  {s.firstname} {s.lastname}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

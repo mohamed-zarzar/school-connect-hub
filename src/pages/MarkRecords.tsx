@@ -848,7 +848,7 @@ function BulkOfficialDialog({ open, onOpenChange, levels, classes, subjects, onS
             <Select value={levelId || 'none'} onValueChange={v => { setLevelId(v === 'none' ? '' : v); setSelectedClasses([]); setSelectedSubjects([]); }}>
               <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Select level (optional)</SelectItem>
+                <SelectItem value="none">Select level</SelectItem>
                 {levels.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -856,16 +856,20 @@ function BulkOfficialDialog({ open, onOpenChange, levels, classes, subjects, onS
 
           <div className="space-y-2">
             <Label>Classes (multi-select)</Label>
-            <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
-              {filteredClasses.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No classes available</p>
-              ) : filteredClasses.map((c: any) => (
-                <label key={c.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
-                  <Checkbox checked={selectedClasses.includes(c.id)} onCheckedChange={() => toggleClass(c.id)} />
-                  {c.name}
-                </label>
-              ))}
-            </div>
+            {!levelId ? (
+              <p className="text-xs text-muted-foreground border rounded-md p-3">Select a level first to see classes</p>
+            ) : (
+              <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
+                {filteredClasses.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No classes available</p>
+                ) : filteredClasses.map((c: any) => (
+                  <label key={c.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={selectedClasses.includes(c.id)} onCheckedChange={() => toggleClass(c.id)} />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            )}
             {selectedClasses.length > 0 && (
               <p className="text-xs text-muted-foreground">{selectedClasses.length} selected</p>
             )}
@@ -873,16 +877,20 @@ function BulkOfficialDialog({ open, onOpenChange, levels, classes, subjects, onS
 
           <div className="space-y-2">
             <Label>Subjects (multi-select)</Label>
-            <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
-              {filteredSubjects.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No subjects available</p>
-              ) : filteredSubjects.map((s: any) => (
-                <label key={s.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
-                  <Checkbox checked={selectedSubjects.includes(s.id)} onCheckedChange={() => toggleSubject(s.id)} />
-                  {s.name}
-                </label>
-              ))}
-            </div>
+            {!levelId ? (
+              <p className="text-xs text-muted-foreground border rounded-md p-3">Select a level first to see subjects</p>
+            ) : (
+              <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
+                {filteredSubjects.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No subjects available</p>
+                ) : filteredSubjects.map((s: any) => (
+                  <label key={s.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
+                    <Checkbox checked={selectedSubjects.includes(s.id)} onCheckedChange={() => toggleSubject(s.id)} />
+                    {s.name}
+                  </label>
+                ))}
+              </div>
+            )}
             {selectedSubjects.length > 0 && (
               <p className="text-xs text-muted-foreground">{selectedSubjects.length} selected</p>
             )}
