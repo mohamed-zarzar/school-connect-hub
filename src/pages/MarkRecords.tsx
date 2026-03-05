@@ -157,6 +157,7 @@ export default function MarkRecords() {
           <Button variant="outline" size="sm" onClick={() => setShowStats(!showStats)}><BarChart3 className="mr-2 h-4 w-4" />{showStats ? 'Hide Stats' : 'Statistics'}</Button>
           <Button variant="outline" size="sm" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Export</Button>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
+          <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}><Grid3X3 className="mr-2 h-4 w-4" />Bulk Official</Button>
           <Button size="sm" variant="outline" onClick={() => { setEditRecord(null); setOfficialOpen(true); }}><Plus className="mr-2 h-4 w-4" />Official</Button>
           <Button size="sm" onClick={() => { setEditRecord(null); setNonOfficialOpen(true); }}><Plus className="mr-2 h-4 w-4" />Non-Official</Button>
         </div>
