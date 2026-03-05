@@ -24,8 +24,10 @@ import type { Column } from '@/components/DataTable';
 
 export default function MarkRecords() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [page] = useState(1);
   const [filterOfficial, setFilterOfficial] = useState<string>('all');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [filterType, setFilterType] = useState('all');
   const [filterLevel, setFilterLevel] = useState('all');
   const [filterClass, setFilterClass] = useState('all');
