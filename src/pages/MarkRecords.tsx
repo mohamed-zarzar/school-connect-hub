@@ -848,7 +848,7 @@ function BulkOfficialDialog({ open, onOpenChange, levels, classes, subjects, onS
             <Select value={levelId || 'none'} onValueChange={v => { setLevelId(v === 'none' ? '' : v); setSelectedClasses([]); setSelectedSubjects([]); }}>
               <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Select level (optional)</SelectItem>
+                <SelectItem value="none">Select level</SelectItem>
                 {levels.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
               </SelectContent>
             </Select>
