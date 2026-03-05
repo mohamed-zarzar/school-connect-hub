@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { markRecordApi } from '@/services/mark-record-api';
 import { studentApi, levelApi, classApi, subjectApi, teacherApi } from '@/services/api';
 import type { MarkRecord, NonOfficialMarkRecord, OfficialMarkRecord } from '@/types/mark-record';
@@ -13,7 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Pencil, Download, Upload, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, Pencil, Download, Upload, BarChart3, Grid3X3 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { exportToExcel } from '@/lib/excel-utils';
@@ -22,8 +24,10 @@ import type { Column } from '@/components/DataTable';
 
 export default function MarkRecords() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [page] = useState(1);
   const [filterOfficial, setFilterOfficial] = useState<string>('all');
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [filterType, setFilterType] = useState('all');
   const [filterLevel, setFilterLevel] = useState('all');
   const [filterClass, setFilterClass] = useState('all');
@@ -153,6 +157,7 @@ export default function MarkRecords() {
           <Button variant="outline" size="sm" onClick={() => setShowStats(!showStats)}><BarChart3 className="mr-2 h-4 w-4" />{showStats ? 'Hide Stats' : 'Statistics'}</Button>
           <Button variant="outline" size="sm" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Export</Button>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}><Upload className="mr-2 h-4 w-4" />Import</Button>
+          <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}><Grid3X3 className="mr-2 h-4 w-4" />Bulk Official</Button>
           <Button size="sm" variant="outline" onClick={() => { setEditRecord(null); setOfficialOpen(true); }}><Plus className="mr-2 h-4 w-4" />Official</Button>
           <Button size="sm" onClick={() => { setEditRecord(null); setNonOfficialOpen(true); }}><Plus className="mr-2 h-4 w-4" />Non-Official</Button>
         </div>
@@ -330,6 +335,22 @@ export default function MarkRecords() {
         onOpenChange={setImportOpen}
         onImport={handleImport}
         expectedColumns={['Student', 'Subject', 'Type', 'Score', 'MaxScore', 'Date', 'Notes']}
+      />
+
+      <BulkOfficialDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        levels={levels}
+        classes={classes}
+        subjects={subjects}
+        onStart={(levelId, classIds, subjectIds) => {
+          setBulkOpen(false);
+          const params = new URLSearchParams();
+          if (levelId) params.set('levelId', levelId);
+          if (classIds.length) params.set('classIds', classIds.join(','));
+          if (subjectIds.length) params.set('subjectIds', subjectIds.join(','));
+          navigate(`/mark-records/bulk?${params.toString()}`);
+        }}
       />
     </div>
   );
@@ -779,6 +800,103 @@ function OfficialFormDialog({ open, onOpenChange, record, students, subjects, le
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={upsertMut.isPending}>{existingId ? 'Update' : 'Save'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Bulk Official Dialog ────────────────────────────────────────
+function BulkOfficialDialog({ open, onOpenChange, levels, classes, subjects, onStart }: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  levels: any[];
+  classes: any[];
+  subjects: any[];
+  onStart: (levelId: string, classIds: string[], subjectIds: string[]) => void;
+}) {
+  const [levelId, setLevelId] = useState('');
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (open) { setLevelId(''); setSelectedClasses([]); setSelectedSubjects([]); }
+  }, [open]);
+
+  const filteredClasses = classes.filter((c: any) => !levelId || c.levelId === levelId);
+  const filteredSubjects = levelId
+    ? subjects.filter((s: any) => {
+        const level = levels.find((l: any) => l.id === levelId);
+        return level?.subjectIds?.includes(s.id);
+      })
+    : subjects;
+
+  const toggleClass = (id: string) => {
+    setSelectedClasses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSubject = (id: string) => {
+    setSelectedSubjects(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Bulk Official Marks</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Level</Label>
+            <Select value={levelId || 'none'} onValueChange={v => { setLevelId(v === 'none' ? '' : v); setSelectedClasses([]); setSelectedSubjects([]); }}>
+              <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Select level (optional)</SelectItem>
+                {levels.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Classes (multi-select)</Label>
+            <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
+              {filteredClasses.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No classes available</p>
+              ) : filteredClasses.map((c: any) => (
+                <label key={c.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
+                  <Checkbox checked={selectedClasses.includes(c.id)} onCheckedChange={() => toggleClass(c.id)} />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+            {selectedClasses.length > 0 && (
+              <p className="text-xs text-muted-foreground">{selectedClasses.length} selected</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Subjects (multi-select)</Label>
+            <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
+              {filteredSubjects.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No subjects available</p>
+              ) : filteredSubjects.map((s: any) => (
+                <label key={s.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
+                  <Checkbox checked={selectedSubjects.includes(s.id)} onCheckedChange={() => toggleSubject(s.id)} />
+                  {s.name}
+                </label>
+              ))}
+            </div>
+            {selectedSubjects.length > 0 && (
+              <p className="text-xs text-muted-foreground">{selectedSubjects.length} selected</p>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {selectedClasses.length > 0 && selectedSubjects.length > 0
+              ? 'Students from selected classes will be auto-filled in the table.'
+              : 'Leave empty to manually add students in the table.'}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => onStart(levelId, selectedClasses, selectedSubjects)}>Start</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
