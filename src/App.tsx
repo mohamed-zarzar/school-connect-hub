@@ -31,6 +31,7 @@ import ScanExam from "./pages/ScanExam";
 import ExternalExams from "./pages/ExternalExams";
 import ExternalExamDetail from "./pages/ExternalExamDetail";
 import MarkRecords from "./pages/MarkRecords";
+import BulkOfficialMarks from "./pages/BulkOfficialMarks";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
