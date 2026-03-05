@@ -132,6 +132,15 @@ export default function BulkOfficialMarks() {
     setRows(prev => prev.filter(r => r.key !== key));
   };
 
+  // Track used student+subject combos for uniqueness
+  const usedCombos = useMemo(() => {
+    const set = new Set<string>();
+    rows.forEach(r => {
+      if (r.studentId && r.subjectId) set.add(`${r.studentId}__${r.subjectId}`);
+    });
+    return set;
+  }, [rows]);
+
   const updateRow = (key: string, field: string, value: any) => {
     setRows(prev => prev.map(r => r.key === key ? { ...r, [field]: value, saved: false } : r));
   };
