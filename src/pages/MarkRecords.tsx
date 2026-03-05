@@ -336,6 +336,22 @@ export default function MarkRecords() {
         onImport={handleImport}
         expectedColumns={['Student', 'Subject', 'Type', 'Score', 'MaxScore', 'Date', 'Notes']}
       />
+
+      <BulkOfficialDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        levels={levels}
+        classes={classes}
+        subjects={subjects}
+        onStart={(levelId, classIds, subjectIds) => {
+          setBulkOpen(false);
+          const params = new URLSearchParams();
+          if (levelId) params.set('levelId', levelId);
+          if (classIds.length) params.set('classIds', classIds.join(','));
+          if (subjectIds.length) params.set('subjectIds', subjectIds.join(','));
+          navigate(`/mark-records/bulk?${params.toString()}`);
+        }}
+      />
     </div>
   );
 }
