@@ -805,3 +805,100 @@ function OfficialFormDialog({ open, onOpenChange, record, students, subjects, le
     </Dialog>
   );
 }
+
+// ─── Bulk Official Dialog ────────────────────────────────────────
+function BulkOfficialDialog({ open, onOpenChange, levels, classes, subjects, onStart }: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  levels: any[];
+  classes: any[];
+  subjects: any[];
+  onStart: (levelId: string, classIds: string[], subjectIds: string[]) => void;
+}) {
+  const [levelId, setLevelId] = useState('');
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (open) { setLevelId(''); setSelectedClasses([]); setSelectedSubjects([]); }
+  }, [open]);
+
+  const filteredClasses = classes.filter((c: any) => !levelId || c.levelId === levelId);
+  const filteredSubjects = levelId
+    ? subjects.filter((s: any) => {
+        const level = levels.find((l: any) => l.id === levelId);
+        return level?.subjectIds?.includes(s.id);
+      })
+    : subjects;
+
+  const toggleClass = (id: string) => {
+    setSelectedClasses(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const toggleSubject = (id: string) => {
+    setSelectedSubjects(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Bulk Official Marks</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Level</Label>
+            <Select value={levelId || 'none'} onValueChange={v => { setLevelId(v === 'none' ? '' : v); setSelectedClasses([]); setSelectedSubjects([]); }}>
+              <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Select level (optional)</SelectItem>
+                {levels.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Classes (multi-select)</Label>
+            <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
+              {filteredClasses.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No classes available</p>
+              ) : filteredClasses.map((c: any) => (
+                <label key={c.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
+                  <Checkbox checked={selectedClasses.includes(c.id)} onCheckedChange={() => toggleClass(c.id)} />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+            {selectedClasses.length > 0 && (
+              <p className="text-xs text-muted-foreground">{selectedClasses.length} selected</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Subjects (multi-select)</Label>
+            <div className="border rounded-md p-2 max-h-40 overflow-y-auto space-y-1">
+              {filteredSubjects.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No subjects available</p>
+              ) : filteredSubjects.map((s: any) => (
+                <label key={s.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted cursor-pointer text-sm">
+                  <Checkbox checked={selectedSubjects.includes(s.id)} onCheckedChange={() => toggleSubject(s.id)} />
+                  {s.name}
+                </label>
+              ))}
+            </div>
+            {selectedSubjects.length > 0 && (
+              <p className="text-xs text-muted-foreground">{selectedSubjects.length} selected</p>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {selectedClasses.length > 0 && selectedSubjects.length > 0
+              ? 'Students from selected classes will be auto-filled in the table.'
+              : 'Leave empty to manually add students in the table.'}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => onStart(levelId, selectedClasses, selectedSubjects)}>Start</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

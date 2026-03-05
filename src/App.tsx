@@ -71,6 +71,7 @@ const App = () => (
             <Route path="/external-exams" element={<ExternalExams />} />
             <Route path="/external-exams/:id" element={<ExternalExamDetail />} />
             <Route path="/mark-records" element={<MarkRecords />} />
+            <Route path="/mark-records/bulk" element={<BulkOfficialMarks />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<NotFound />} />
