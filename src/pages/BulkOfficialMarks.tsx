@@ -422,3 +422,52 @@ export default function BulkOfficialMarks() {
     </div>
   );
 }
+
+// ─── Searchable Student Combobox ─────────────────────────────────
+function StudentCombobox({ students, value, onSelect, getStudentName }: {
+  students: any[];
+  value: string;
+  onSelect: (id: string) => void;
+  getStudentName: (id: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-8 w-full justify-between text-xs font-normal"
+        >
+          <span className="truncate">
+            {value ? getStudentName(value) : 'Select student...'}
+          </span>
+          <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[220px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search student..." className="h-8 text-xs" />
+          <CommandList>
+            <CommandEmpty>No student found.</CommandEmpty>
+            <CommandGroup>
+              {students.map(s => (
+                <CommandItem
+                  key={s.id}
+                  value={`${s.firstname} ${s.lastname}`}
+                  onSelect={() => { onSelect(s.id); setOpen(false); }}
+                  className="text-xs"
+                >
+                  <Check className={cn("mr-2 h-3 w-3", value === s.id ? "opacity-100" : "opacity-0")} />
+                  {s.firstname} {s.lastname}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
