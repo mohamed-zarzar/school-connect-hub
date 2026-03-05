@@ -51,6 +51,7 @@ export default function Exams() {
   const [mediumCount, setMediumCount] = useState(3);
   const [hardCount, setHardCount] = useState(2);
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [examStatus, setExamStatus] = useState<'draft' | 'published'>('draft');
 
   // Queries
   const [importOpen, setImportOpen] = useState(false);
@@ -116,6 +117,7 @@ export default function Exams() {
     setEditingExamId(exam.id);
     setExamName(exam.name);
     setMaxScore(exam.maxScore);
+    setExamStatus(exam.status);
     setSelectedLevelId(exam.levelId);
     setSelectedSubjectId(exam.subjectId);
     setSelectedLessons(exam.lessonIds);
@@ -150,7 +152,7 @@ export default function Exams() {
     if (!examName.trim()) { toast({ title: 'Enter exam name', variant: 'destructive' }); return; }
 
     if (editingExamId) {
-      updateMut.mutate({ id: editingExamId, data: { name: examName, maxScore } });
+      updateMut.mutate({ id: editingExamId, data: { name: examName, maxScore, status: examStatus, levelId: selectedLevelId, subjectId: selectedSubjectId, lessonIds: selectedLessons } });
       return;
     }
 
@@ -358,9 +360,23 @@ export default function Exams() {
               </div>
             </div>
 
-            <div>
-              <Label>Max Score</Label>
-              <Input type="number" min={1} value={maxScore} onChange={e => setMaxScore(parseInt(e.target.value) || 100)} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Max Score</Label>
+                <Input type="number" min={1} value={maxScore} onChange={e => setMaxScore(parseInt(e.target.value) || 100)} />
+              </div>
+              {editingExamId && (
+                <div>
+                  <Label>Status</Label>
+                  <Select value={examStatus} onValueChange={v => setExamStatus(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Draft</SelectItem>
+                      <SelectItem value="published">Published</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <Tabs value={mode} onValueChange={v => setMode(v as 'manual' | 'auto')}>

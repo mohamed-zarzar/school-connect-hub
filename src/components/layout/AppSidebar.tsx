@@ -1,7 +1,7 @@
 import { 
   LayoutDashboard, GraduationCap, Users, UserCircle, Briefcase, 
   School, Layers, BookOpen, Settings, ChevronDown, LogOut, GraduationCap as EduIcon,
-  CalendarCheck, ClipboardList, FileQuestion, Library, FileText
+  CalendarCheck, ClipboardList, FileQuestion, Library, FileText, Award
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useState } from 'react';
@@ -19,8 +19,7 @@ const managementItems = [
   { title: 'Managers', url: '/managers', icon: Briefcase },
   { title: 'Classes', url: '/classes', icon: School },
   { title: 'Levels', url: '/levels', icon: Layers },
-  { title: 'Subjects', url: '/subjects', icon: BookOpen },
-  { title: 'Lessons', url: '/lessons', icon: Library },
+
 ];
 
 const attendanceItems = [
@@ -30,9 +29,13 @@ const attendanceItems = [
 ];
 
 const examItems = [
+  { title: 'Subjects', url: '/subjects', icon: BookOpen },
+  { title: 'Lessons', url: '/lessons', icon: Library },
   { title: 'Questions', url: '/questions', icon: FileQuestion },
+  { title: 'Mark Records', url: '/mark-records', icon: Award },
   { title: 'Exams', url: '/exams', icon: FileText },
   { title: 'External Exams', url: '/external-exams', icon: ClipboardList },
+  
 ];
 
 export function AppSidebar() {

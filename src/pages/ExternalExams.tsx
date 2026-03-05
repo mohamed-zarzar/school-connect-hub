@@ -41,6 +41,13 @@ export default function ExternalExams() {
   const [answerKey, setAnswerKey] = useState<Record<number, string>>({});
   const [createTab, setCreateTab] = useState<'manual' | 'excel'>('manual');
 
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState<ExternalExam | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCount, setEditCount] = useState(20);
+  const [editAnswerKey, setEditAnswerKey] = useState<Record<number, string>>({});
+
   // Camera / correction
   const [omrResult, setOmrResult] = useState<OMRResult | null>(null);
   const [editedAnswers, setEditedAnswers] = useState<Record<number, string | null>>({});
@@ -76,6 +83,10 @@ export default function ExternalExams() {
   const deleteMut = useMutation({
     mutationFn: (id: string) => externalExamApi.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['external-exams'] }); toast({ title: 'Deleted' }); },
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<ExternalExam> }) => externalExamApi.update(id, data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['external-exams'] }); toast({ title: 'Exam updated' }); setEditOpen(false); setEditingExam(null); },
   });
   const submitMut = useMutation({
     mutationFn: ({ examId, answers }: { examId: string; answers: Record<number, string | null> }) =>
@@ -212,6 +223,19 @@ export default function ExternalExams() {
     setCreateCount(20);
     setAnswerKey({});
     setStep('create');
+  };
+
+  const openEditExam = (exam: ExternalExam) => {
+    setEditingExam(exam);
+    setEditName(exam.name);
+    setEditCount(exam.totalQuestions);
+    setEditAnswerKey({ ...exam.answerKey });
+    setEditOpen(true);
+  };
+
+  const handleUpdateExam = () => {
+    if (!editingExam || !editName.trim()) return;
+    updateMut.mutate({ id: editingExam.id, data: { name: editName, totalQuestions: editCount, answerKey: editAnswerKey } });
   };
 
   // ── Result View ──
@@ -507,7 +531,7 @@ export default function ExternalExams() {
                   <TableCell className="text-muted-foreground text-sm">{new Date(exam.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button variant="ghost" size="icon" onClick={() => navigate(`/external-exams/${exam.id}`)} title="View Details"><Eye className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => navigate(`/external-exams/${exam.id}`)} title="Edit"><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => openEditExam(exam)} title="Edit"><Edit className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => openCorrect(exam)} title="Correct"><Camera className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => deleteMut.mutate(exam.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </TableCell>
@@ -517,6 +541,48 @@ export default function ExternalExams() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit External Exam Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit External Exam</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Exam Name *</Label>
+              <Input value={editName} onChange={e => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <Label>Number of Questions *</Label>
+              <Input type="number" min={1} max={200} value={editCount} onChange={e => setEditCount(parseInt(e.target.value) || 1)} />
+            </div>
+            <div>
+              <Label>Answer Key</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mt-2 max-h-[400px] overflow-y-auto" dir="ltr">
+                {Array.from({ length: editCount }, (_, i) => i + 1).map(qNum => (
+                  <div key={qNum} className="border rounded-md p-2">
+                    <span className="text-xs font-bold block mb-1">Q{qNum}</span>
+                    <div className="flex gap-1">
+                      {OPTION_LABELS.map(opt => (
+                        <button key={opt} onClick={() => setEditAnswerKey(prev => ({ ...prev, [qNum]: opt }))}
+                          className={`w-7 h-7 rounded-full border text-xs font-bold transition-colors ${editAnswerKey[qNum] === opt ? 'bg-primary text-primary-foreground border-primary' : 'border-muted-foreground/30 hover:border-primary/50'}`}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">{Object.keys(editAnswerKey).filter(k => Number(k) <= editCount).length}/{editCount} answers set</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpdateExam} disabled={updateMut.isPending}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
