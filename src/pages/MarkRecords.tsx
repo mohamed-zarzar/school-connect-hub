@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { markRecordApi } from '@/services/mark-record-api';
 import { studentApi, levelApi, classApi, subjectApi, teacherApi } from '@/services/api';
 import type { MarkRecord, NonOfficialMarkRecord, OfficialMarkRecord } from '@/types/mark-record';
