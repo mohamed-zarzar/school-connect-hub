@@ -344,15 +344,12 @@ export default function BulkOfficialMarks() {
                 <TableRow key={row.key} className={row.saved ? 'bg-green-50 dark:bg-green-950/20' : ''}>
                   <TableCell className="font-mono text-xs text-muted-foreground sticky left-0 bg-background z-10">{idx + 1}</TableCell>
                   <TableCell>
-                    <Select value={row.studentId || 'none'} onValueChange={v => handleStudentSelect(row.key, v === 'none' ? '' : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select student" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select student</SelectItem>
-                        {availableStudents.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.firstname} {s.lastname}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <StudentCombobox
+                      students={availableStudents}
+                      value={row.studentId}
+                      onSelect={(id) => handleStudentSelect(row.key, id)}
+                      getStudentName={getStudentName}
+                    />
                   </TableCell>
                   <TableCell>
                     <Select value={row.subjectId || 'none'} onValueChange={v => handleSubjectSelect(row.key, v === 'none' ? '' : v)}>
