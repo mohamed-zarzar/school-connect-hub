@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, BarChart3 } from 'lucide-react';
 import { levelApi, classApi, subjectApi, teacherApi, studentApi, managerApi } from '@/services/api';
+import { MarkStatisticsPanel } from '@/components/MarkStatisticsPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -74,6 +75,7 @@ export default function LevelDetail() {
           <TabsTrigger value="information">Information</TabsTrigger>
           <TabsTrigger value="subjects">Subjects</TabsTrigger>
           <TabsTrigger value="classes">Classes</TabsTrigger>
+          <TabsTrigger value="marks" className="gap-2"><BarChart3 className="h-4 w-4" />Mark Statistics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="information">
@@ -198,6 +200,14 @@ export default function LevelDetail() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="marks">
+          <MarkStatisticsPanel
+            fixedLevelId={id!}
+            showFilters={true}
+            title={`Mark Statistics — ${level.name}`}
+          />
         </TabsContent>
       </Tabs>
     </div>

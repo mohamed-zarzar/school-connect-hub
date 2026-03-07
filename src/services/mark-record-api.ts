@@ -148,7 +148,7 @@ export const markRecordApi = {
   getTemplateForLevel: (levelId: string): OfficialTemplate | undefined => markRecordSettings.officialTemplates.find(t => t.levelId === levelId),
 
   // Statistics
-  getOfficialStats: async (filters: { levelId?: string; classId?: string; subjectId?: string; teacherClassSubjects?: { classId: string; subjectIds: string[] }[] }): Promise<ApiResponse<{ completion: { filled: number; total: number; percentage: number }; averages: { columnId: string; columnName: string; average: number; maxScore: number }[] }>> => {
+  getOfficialStats: async (filters: { levelId?: string; classId?: string; subjectId?: string; teacherClassSubjects?: { classId: string; subjectIds: string[] }[]; expectedPairCount?: number }): Promise<ApiResponse<{ completion: { filled: number; total: number; percentage: number }; columnCompletion: { columnId: string; columnName: string; filled: number; total: number; percentage: number }[]; averages: { columnId: string; columnName: string; average: number; maxScore: number }[] }>> => {
     await delay();
     const officialRecords = markRecords.filter(r => r.isOfficial) as OfficialMarkRecord[];
     let filtered = [...officialRecords];
@@ -159,34 +159,55 @@ export const markRecordApi = {
       filtered = filtered.filter(r => filters.teacherClassSubjects!.some(cs => cs.classId === r.classId && cs.subjectIds.includes(r.subjectId)));
     }
 
-    // Completion: how many cells are filled vs total possible
+    // Determine template - use first matching template for the level
+    const templateForLevel = filters.levelId ? markRecordSettings.officialTemplates.find(t => t.levelId === filters.levelId) : markRecordSettings.officialTemplates[0];
+    const templateColumns = templateForLevel?.columns || [];
+    const expectedPairs = filters.expectedPairCount || filtered.length;
+
+    // Total cells = expectedPairs * columns (includes uncreated records as all-empty)
+    const totalCells = expectedPairs * templateColumns.length;
     let filledCells = 0;
-    let totalCells = 0;
-    const columnAggregates: Record<string, { sum: number; count: number; name: string; maxScore: number }> = {};
+    const columnAggregates: Record<string, { sum: number; count: number; filled: number; name: string; maxScore: number }> = {};
+    
+    // Initialize column aggregates
+    for (const col of templateColumns) {
+      columnAggregates[col.id] = { sum: 0, count: 0, filled: 0, name: col.name, maxScore: col.maxScore };
+    }
+
     for (const rec of filtered) {
       const tpl = markRecordSettings.officialTemplates.find(t => t.id === rec.templateId);
       if (!tpl) continue;
       for (const col of tpl.columns) {
-        totalCells++;
         if (rec.scores[col.id] !== undefined && rec.scores[col.id] !== null) {
           filledCells++;
-          if (!columnAggregates[col.id]) columnAggregates[col.id] = { sum: 0, count: 0, name: col.name, maxScore: col.maxScore };
-          columnAggregates[col.id].sum += rec.scores[col.id];
-          columnAggregates[col.id].count++;
+          if (columnAggregates[col.id]) {
+            columnAggregates[col.id].filled++;
+            columnAggregates[col.id].sum += rec.scores[col.id];
+            columnAggregates[col.id].count++;
+          }
         }
       }
     }
 
-    const averages = Object.entries(columnAggregates).map(([columnId, agg]) => ({
+    const columnCompletion = templateColumns.map(col => ({
+      columnId: col.id,
+      columnName: columnAggregates[col.id]?.name || col.name,
+      filled: columnAggregates[col.id]?.filled || 0,
+      total: expectedPairs,
+      percentage: expectedPairs > 0 ? Math.round(((columnAggregates[col.id]?.filled || 0) / expectedPairs) * 100) : 0,
+    }));
+
+    const averages = Object.entries(columnAggregates).filter(([, agg]) => agg.count > 0).map(([columnId, agg]) => ({
       columnId,
       columnName: agg.name,
-      average: agg.count > 0 ? Math.round((agg.sum / agg.count) * 100) / 100 : 0,
+      average: Math.round((agg.sum / agg.count) * 100) / 100,
       maxScore: agg.maxScore,
     }));
 
     return {
       data: {
         completion: { filled: filledCells, total: totalCells, percentage: totalCells > 0 ? Math.round((filledCells / totalCells) * 100) : 0 },
+        columnCompletion,
         averages,
       },
       message: 'Success', success: true, statusCode: 200,

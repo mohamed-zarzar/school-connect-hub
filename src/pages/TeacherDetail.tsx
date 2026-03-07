@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { teacherApi, subjectApi, classApi, templateApi } from '@/services/api';
+import { MarkStatisticsPanel } from '@/components/MarkStatisticsPanel';
 import { DynamicView } from '@/components/DynamicView';
 import { DynamicFormFields } from '@/components/DynamicFormFields';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
@@ -14,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { ArrowLeft, UserX, Clock, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, UserX, Clock, Pencil, Trash2, BarChart3 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
@@ -71,6 +72,7 @@ export default function TeacherDetail() {
           <TabsTrigger value="info">Information</TabsTrigger>
           <TabsTrigger value="absences" className="gap-2"><UserX className="h-4 w-4" />Absences</TabsTrigger>
           <TabsTrigger value="lates" className="gap-2"><Clock className="h-4 w-4" />Lates</TabsTrigger>
+          <TabsTrigger value="marks" className="gap-2"><BarChart3 className="h-4 w-4" />Mark Statistics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info">
@@ -114,6 +116,14 @@ export default function TeacherDetail() {
         </TabsContent>
         <TabsContent value="lates">
           <EntityAttendanceTab entityType="teacher" entityId={teacher.id} entityName={fullName} recordType="lates" />
+        </TabsContent>
+
+        <TabsContent value="marks">
+          <MarkStatisticsPanel
+            fixedTeacherClassSubjects={classAssignments}
+            showFilters={true}
+            title={`Mark Statistics — ${fullName}`}
+          />
         </TabsContent>
       </Tabs>
 

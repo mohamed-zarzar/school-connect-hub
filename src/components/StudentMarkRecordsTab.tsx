@@ -259,6 +259,8 @@ function StudentNonOfficialDialog({ open, onOpenChange, record, studentId, stude
 
   const handleSave = () => {
     if (!subjectId || !typeId) { toast.error('Subject and Type are required'); return; }
+    if (score > maxScore) { toast.error(`Score (${score}) cannot exceed Max Score (${maxScore})`); return; }
+    if (score < 0) { toast.error('Score cannot be negative'); return; }
     mut.mutate({ studentId, subjectId, levelId: studentLevelId || '', classId: studentClassId || '', typeId, score, maxScore, date, notes, isOfficial: false });
   };
 
@@ -357,6 +359,17 @@ function StudentOfficialDialog({ open, onOpenChange, record, studentId, studentL
   const handleSave = () => {
     if (!subjectId) { toast.error('Subject is required'); return; }
     if (!template) { toast.error('No template for this level'); return; }
+    for (const col of template.columns) {
+      const val = scores[col.id];
+      if (val !== undefined && val > col.maxScore) {
+        toast.error(`${col.name} score (${val}) cannot exceed max (${col.maxScore})`);
+        return;
+      }
+      if (val !== undefined && val < 0) {
+        toast.error(`${col.name} score cannot be negative`);
+        return;
+      }
+    }
     upsertMut.mutate({ studentId, subjectId, levelId: studentLevelId || '', classId: studentClassId || '', templateId: template.id, scores, date, notes, isOfficial: true });
   };
 

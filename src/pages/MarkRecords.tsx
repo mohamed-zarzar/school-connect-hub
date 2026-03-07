@@ -21,6 +21,7 @@ import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { exportToExcel } from '@/lib/excel-utils';
 import { DatePickerField } from '@/components/DatePickerField';
 import type { Column } from '@/components/DataTable';
+import { MarkStatisticsPanel } from '@/components/MarkStatisticsPanel';
 
 export default function MarkRecords() {
   const qc = useQueryClient();
@@ -358,107 +359,11 @@ export default function MarkRecords() {
 
 // ─── Statistics Panel ────────────────────────────────────────────
 function OfficialStatsPanel({ levels, classes, subjects, teachers }: { levels: any[]; classes: any[]; subjects: any[]; teachers: any[] }) {
-  const [statLevel, setStatLevel] = useState('all');
-  const [statClass, setStatClass] = useState('all');
-  const [statSubject, setStatSubject] = useState('all');
-  const [statTeacher, setStatTeacher] = useState('all');
-
-  const teacherClassSubjects = statTeacher !== 'all'
-    ? teachers.find((t: any) => t.id === statTeacher)?.classAssignments || []
-    : undefined;
-
-  const { data: statsRes } = useQuery({
-    queryKey: ['mark-record-stats', statLevel, statClass, statSubject, statTeacher],
-    queryFn: () => markRecordApi.getOfficialStats({
-      levelId: statLevel === 'all' ? undefined : statLevel,
-      classId: statClass === 'all' ? undefined : statClass,
-      subjectId: statSubject === 'all' ? undefined : statSubject,
-      teacherClassSubjects: teacherClassSubjects,
-    }),
-  });
-
-  const stats = statsRes?.data;
-
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-base flex items-center gap-2"><BarChart3 className="h-4 w-4" />Official Mark Statistics</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Level</Label>
-            <Select value={statLevel} onValueChange={v => { setStatLevel(v); setStatClass('all'); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Levels</SelectItem>
-                {levels.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Class</Label>
-            <Select value={statClass} onValueChange={setStatClass}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Classes</SelectItem>
-                {classes.filter(c => statLevel === 'all' || c.levelId === statLevel).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Subject</Label>
-            <Select value={statSubject} onValueChange={setStatSubject}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Subjects</SelectItem>
-                {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Teacher</Label>
-            <Select value={statTeacher} onValueChange={setStatTeacher}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Teachers</SelectItem>
-                {teachers.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.firstname} {t.lastname}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <p className="text-sm font-medium mb-2">Completion Rate</p>
-                <div className="flex items-center gap-3">
-                  <Progress value={stats.completion.percentage} className="flex-1" />
-                  <span className="text-sm font-mono">{stats.completion.percentage}%</span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">{stats.completion.filled} / {stats.completion.total} cells filled</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <p className="text-sm font-medium mb-2">Column Averages</p>
-                {stats.averages.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No data available</p>
-                ) : (
-                  <div className="space-y-2">
-                    {stats.averages.map(avg => (
-                      <div key={avg.columnId} className="flex items-center justify-between text-sm">
-                        <span>{avg.columnName}</span>
-                        <span className="font-mono">{avg.average} / {avg.maxScore}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <MarkStatisticsPanel
+      showFilters={true}
+      title="Official Mark Statistics"
+    />
   );
 }
 
@@ -518,6 +423,8 @@ function NonOfficialFormDialog({ open, onOpenChange, record, students, subjects,
 
   const handleSave = () => {
     if (!studentId || !subjectId || !typeId) { toast.error('Student, Subject and Type are required'); return; }
+    if (score > maxScore) { toast.error(`Score (${score}) cannot exceed Max Score (${maxScore})`); return; }
+    if (score < 0) { toast.error('Score cannot be negative'); return; }
     const student = students.find(s => s.id === studentId);
     createMut.mutate({
       studentId, subjectId,
@@ -692,6 +599,18 @@ function OfficialFormDialog({ open, onOpenChange, record, students, subjects, le
   const handleSave = () => {
     if (!studentId || !subjectId) { toast.error('Student and Subject are required'); return; }
     if (!template) { toast.error('No template defined for this level'); return; }
+    // Validate scores don't exceed max
+    for (const col of template.columns) {
+      const val = scores[col.id];
+      if (val !== undefined && val > col.maxScore) {
+        toast.error(`${col.name} score (${val}) cannot exceed max (${col.maxScore})`);
+        return;
+      }
+      if (val !== undefined && val < 0) {
+        toast.error(`${col.name} score cannot be negative`);
+        return;
+      }
+    }
     const student = students.find(s => s.id === studentId);
     upsertMut.mutate({
       studentId, subjectId,

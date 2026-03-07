@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,6 +20,7 @@ const schema = z.object({ name: z.string().min(1, 'Required'), section: z.string
 
 export default function ClassesPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<SchoolClass | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null);
@@ -47,7 +49,7 @@ export default function ClassesPage() {
         <div><h1 className="text-2xl font-bold tracking-tight">Classes</h1><p className="text-muted-foreground">{res?.total ?? 0} classes</p></div>
         <Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" />Add Class</Button>
       </div>
-      <DataTable data={res?.data || []} columns={columns} isLoading={isLoading} searchPlaceholder="Search classes..." onEdit={c => { setEditing(c); setDialogOpen(true); }} onDelete={c => setDeleteTarget(c)} exportFilename="classes" />
+      <DataTable data={res?.data || []} columns={columns} isLoading={isLoading} searchPlaceholder="Search classes..." onView={c => navigate(`/classes/${c.id}`)} onEdit={c => { setEditing(c); setDialogOpen(true); }} onDelete={c => setDeleteTarget(c)} exportFilename="classes" />
       <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (o) resetForm(); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? 'Edit Class' : 'Add Class'}</DialogTitle></DialogHeader>
