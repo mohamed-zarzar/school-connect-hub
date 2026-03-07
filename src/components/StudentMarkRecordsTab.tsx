@@ -259,6 +259,8 @@ function StudentNonOfficialDialog({ open, onOpenChange, record, studentId, stude
 
   const handleSave = () => {
     if (!subjectId || !typeId) { toast.error('Subject and Type are required'); return; }
+    if (score > maxScore) { toast.error(`Score (${score}) cannot exceed Max Score (${maxScore})`); return; }
+    if (score < 0) { toast.error('Score cannot be negative'); return; }
     mut.mutate({ studentId, subjectId, levelId: studentLevelId || '', classId: studentClassId || '', typeId, score, maxScore, date, notes, isOfficial: false });
   };
 
