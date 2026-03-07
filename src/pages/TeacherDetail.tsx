@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { teacherApi, subjectApi, classApi, templateApi } from '@/services/api';
+import { MarkStatisticsPanel } from '@/components/MarkStatisticsPanel';
 import { DynamicView } from '@/components/DynamicView';
 import { DynamicFormFields } from '@/components/DynamicFormFields';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
