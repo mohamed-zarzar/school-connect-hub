@@ -117,6 +117,14 @@ export default function TeacherDetail() {
         <TabsContent value="lates">
           <EntityAttendanceTab entityType="teacher" entityId={teacher.id} entityName={fullName} recordType="lates" />
         </TabsContent>
+
+        <TabsContent value="marks">
+          <MarkStatisticsPanel
+            fixedTeacherClassSubjects={classAssignments}
+            showFilters={true}
+            title={`Mark Statistics — ${fullName}`}
+          />
+        </TabsContent>
       </Tabs>
 
       {/* Edit Dialog */}
