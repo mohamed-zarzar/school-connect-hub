@@ -599,6 +599,18 @@ function OfficialFormDialog({ open, onOpenChange, record, students, subjects, le
   const handleSave = () => {
     if (!studentId || !subjectId) { toast.error('Student and Subject are required'); return; }
     if (!template) { toast.error('No template defined for this level'); return; }
+    // Validate scores don't exceed max
+    for (const col of template.columns) {
+      const val = scores[col.id];
+      if (val !== undefined && val > col.maxScore) {
+        toast.error(`${col.name} score (${val}) cannot exceed max (${col.maxScore})`);
+        return;
+      }
+      if (val !== undefined && val < 0) {
+        toast.error(`${col.name} score cannot be negative`);
+        return;
+      }
+    }
     const student = students.find(s => s.id === studentId);
     upsertMut.mutate({
       studentId, subjectId,

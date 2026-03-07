@@ -146,10 +146,18 @@ export default function BulkOfficialMarks() {
   };
 
   const updateScore = (key: string, colId: string, value: string) => {
+    const col = columns.find(c => c.id === colId);
     setRows(prev => prev.map(r => {
       if (r.key !== key) return r;
       const newScores = { ...r.scores };
-      newScores[colId] = value === '' ? '' : Number(value);
+      if (value === '') {
+        newScores[colId] = '';
+      } else {
+        let num = Number(value);
+        if (num < 0) num = 0;
+        if (col && num > col.maxScore) num = col.maxScore;
+        newScores[colId] = num;
+      }
       return { ...r, scores: newScores, saved: false };
     }));
   };
