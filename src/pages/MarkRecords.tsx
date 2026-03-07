@@ -423,6 +423,8 @@ function NonOfficialFormDialog({ open, onOpenChange, record, students, subjects,
 
   const handleSave = () => {
     if (!studentId || !subjectId || !typeId) { toast.error('Student, Subject and Type are required'); return; }
+    if (score > maxScore) { toast.error(`Score (${score}) cannot exceed Max Score (${maxScore})`); return; }
+    if (score < 0) { toast.error('Score cannot be negative'); return; }
     const student = students.find(s => s.id === studentId);
     createMut.mutate({
       studentId, subjectId,
