@@ -21,6 +21,7 @@ import { ExcelImportDialog } from '@/components/ExcelImportDialog';
 import { exportToExcel } from '@/lib/excel-utils';
 import { DatePickerField } from '@/components/DatePickerField';
 import type { Column } from '@/components/DataTable';
+import { MarkStatisticsPanel } from '@/components/MarkStatisticsPanel';
 
 export default function MarkRecords() {
   const qc = useQueryClient();
