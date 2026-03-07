@@ -20,6 +20,7 @@ const schema = z.object({ name: z.string().min(1, 'Required'), section: z.string
 
 export default function ClassesPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<SchoolClass | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SchoolClass | null>(null);
